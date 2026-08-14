@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Avast!</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1b4332">
+  <link rel="stylesheet" href="style.css?v=0.1.0">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <div id="title-group">
+        <span id="game-title">Avast!</span>
+        <a class="back-to-hub" href="https://freeappstoenjoy.com">&larr; All Games and Apps</a>
+      </div>
+      <span id="build-tag" style="font-size:.65rem;color:#555;letter-spacing:1px;">v0.1.0 — core loop</span>
+      <div id="topbar-controls">
+        <button id="btn-new-game">New Game</button>
+      </div>
+    </div>
+
+    <!-- Main table -->
+    <div id="table">
+      <div class="ship-zone" id="zone-opponent"></div>
+      <div id="ocean"></div>
+      <div class="ship-zone" id="zone-you"></div>
+    </div>
+
+    <!-- Human player hand -->
+    <div id="player-zone">
+      <div id="log"></div>
+      <div id="hand"></div>
+      <div id="action-bar"></div>
+    </div>
+
+  </div>
+
+  <!-- Start screen -->
+  <div id="modal-start" class="modal">
+    <div class="modal-box start-box">
+      <h1>Avast!</h1>
+      <p class="subtitle">The Pirate Card Game</p>
+      <p class="start-desc">You vs. one AI captain. Put your ship to sea, fight for gold, and be first to stash 3000g at Home Port.</p>
+      <button id="btn-start" class="action-btn primary large">Set Sail</button>
+    </div>
+  </div>
+
+  <!-- Home Port modal -->
+  <div id="modal-homeport" class="modal hidden">
+    <div class="modal-box">
+      <h2>Home Port</h2>
+      <div id="homeport-summary"></div>
+      <div class="trade-label">Buy a new ship from your hand (optional):</div>
+      <div id="homeport-ship-choices" class="hand-row"></div>
+      <div class="modal-actions">
+        <button id="btn-homeport-cancel">Cancel</button>
+        <button id="btn-homeport-confirm" class="action-btn primary">Keep Current Ship &amp; Sail</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flee decision modal -->
+  <div id="modal-flee" class="modal hidden">
+    <div class="modal-box">
+      <h2>Your ship is under attack!</h2>
+      <p>Your speed advantage gives you a chance to flee before combat begins.</p>
+      <div class="modal-actions">
+        <button id="btn-flee-stand" class="action-btn">Stand and Fight</button>
+        <button id="btn-flee-attempt" class="action-btn primary">Attempt to Flee</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over modal -->
+  <div id="modal-gameover" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="gameover-title">Game Over</h2>
+      <p id="gameover-desc"></p>
+      <div class="modal-actions">
+        <button id="btn-gameover-again" class="action-btn primary">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="cards.js?v=0.1.0"></script>
+  <script src="game.js?v=0.1.0"></script>
+  <script src="ui.js?v=0.1.0"></script>
+</body>
+</html>

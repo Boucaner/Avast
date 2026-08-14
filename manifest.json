@@ -1,0 +1,18 @@
+{
+  "name": "Avast!",
+  "short_name": "Avast!",
+  "description": "The pirate card game Avast!",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111111",
+  "theme_color": "#1b4332",
+  "start_url": ".",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

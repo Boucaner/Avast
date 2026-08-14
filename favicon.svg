@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background -->
+  <rect width="64" height="64" rx="10" fill="#1b4332"/>
+  <!-- Anchor -->
+  <circle cx="32" cy="14" r="5" fill="none" stroke="#f4d03f" stroke-width="4"/>
+  <rect x="30" y="19" width="4" height="30" fill="#f4d03f"/>
+  <rect x="18" y="24" width="28" height="4" fill="#f4d03f"/>
+  <path d="M16,34 Q16,50 32,52 Q48,50 48,34" fill="none" stroke="#f4d03f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M13,32 L19,38 L13,38 Z" fill="#f4d03f"/>
+  <path d="M51,32 L45,38 L51,38 Z" fill="#f4d03f"/>
+</svg>

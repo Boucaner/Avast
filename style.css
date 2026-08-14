@@ -1,0 +1,265 @@
+/* ── Design tokens (shared with the other games in the hub) ──────────── */
+:root {
+  --green:       #2d6a4f;
+  --green-light: #40916c;
+  --felt:        #1b4332;
+  --card-w:      110px;
+  --card-h:      130px;
+  --card-radius: 8px;
+  --red:         #c0392b;
+  --gold:        #f4d03f;
+  --shadow:      0 4px 12px rgba(0,0,0,.5);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  background: #0d0d0d;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#app {
+  height: 100dvh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #111;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
+}
+#title-group { display: flex; align-items: baseline; gap: 10px; }
+#game-title { font-size: 1.3rem; font-weight: 700; color: var(--gold); letter-spacing: 1px; }
+.back-to-hub { color: #888; font-size: .78rem; text-decoration: none; }
+.back-to-hub:hover { color: var(--gold); text-decoration: underline; }
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  .back-to-hub { display: none; }
+}
+#topbar-controls button {
+  background: #1a1a1a; color: #ddd; border: 1px solid #333;
+  border-radius: 6px; padding: 6px 12px; font-size: .8rem; cursor: pointer;
+}
+#topbar-controls button:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Table ───────────────────────────────────────────────────────────── */
+#table {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 150px) minmax(0, 1fr) minmax(0, 150px);
+  gap: 8px;
+  padding: 10px;
+  background: radial-gradient(ellipse at center, var(--green-light) 0%, var(--felt) 60%, #0f2418 100%);
+  overflow: hidden;
+}
+
+.ship-zone {
+  background: rgba(0,0,0,.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  min-height: 0;
+  overflow-y: auto;
+}
+.ship-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.ship-name { font-weight: 700; font-size: 1.05rem; color: #fff; }
+.ship-rating { color: var(--gold); font-variant-numeric: tabular-nums; font-size: .95rem; }
+.ship-slots { display: flex; flex-wrap: wrap; gap: 8px; min-height: calc(var(--card-h) * 0.5); }
+.ship-econ {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin-top: 8px; font-size: .78rem; color: #bbb;
+}
+
+#ocean {
+  min-height: 0;
+  overflow-y: auto;
+  background: rgba(0,0,0,.2);
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ocean-empty { color: #bbb; font-size: .85rem; text-align: center; margin: auto; }
+
+.sea-ship {
+  background: rgba(0,0,0,.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.sea-ship-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px; flex-wrap: wrap; gap: 6px;
+}
+.sea-ship-owner { font-size: .72rem; color: #999; text-transform: uppercase; letter-spacing: .5px; }
+.sea-ship-name { font-weight: 700; color: #fff; margin-right: 8px; }
+.sea-ship-rating { color: var(--gold); font-variant-numeric: tabular-nums; }
+.sea-ship-actions { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.load-row { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.1); }
+.load-row-label { font-size: .68rem; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+.load-candidates { display: flex; gap: 8px; flex-wrap: wrap; }
+.load-candidate { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.load-candidate .mini-name { font-size: .68rem; color: #ccc; max-width: 90px; text-align: center; }
+
+#log {
+  min-height: 0;
+  max-height: 90px;
+  overflow-y: auto;
+  background: rgba(0,0,0,.35);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: .74rem;
+  color: #ccc;
+  border: 1px solid rgba(255,255,255,.06);
+}
+.log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.log-line:last-child { color: var(--gold); font-weight: 600; }
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+.card {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  background: #fff;
+  color: #222;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px;
+  font-size: .72rem;
+  flex-shrink: 0;
+}
+.card-cat { text-transform: uppercase; letter-spacing: .5px; font-size: .6rem; color: #888; }
+.card-name { font-weight: 700; line-height: 1.15; }
+.card-stat { color: var(--green); font-weight: 600; }
+
+.cardtype-ship     { border-top: 4px solid #2563eb; }
+.cardtype-captain  { border-top: 4px solid #7c3aed; }
+.cardtype-crew     { border-top: 4px solid #059669; }
+.cardtype-officer  { border-top: 4px solid #0891b2; }
+.cardtype-upgrade  { border-top: 4px solid #ea580c; }
+.cardtype-treasure { border-top: 4px solid var(--gold); }
+.cardtype-vip      { border-top: 4px solid var(--red); }
+
+.card.face-down {
+  background: repeating-linear-gradient(135deg, #1a237e 0px, #1a237e 8px, #283593 8px, #283593 16px);
+  display: flex; align-items: center; justify-content: center;
+  color: #cbd5e1; font-size: .68rem; text-align: center;
+}
+
+.hand-card-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mini-btn-row { display: flex; gap: 4px; }
+.mini-btn {
+  background: #1a1a1a; color: var(--gold); border: 1px solid var(--gold);
+  border-radius: 5px; padding: 3px 8px; font-size: .68rem; cursor: pointer;
+}
+.mini-btn:hover:not(:disabled) { background: var(--gold); color: #111; }
+.mini-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ── Player hand & action bar ───────────────────────────────────────── */
+#player-zone {
+  flex-shrink: 0;
+  background: #111;
+  border-top: 1px solid #222;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+#hand, .hand-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  min-height: calc(var(--card-h) + 30px);
+}
+#action-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.phase-note { color: #aaa; font-size: .82rem; }
+
+.action-btn {
+  background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  border-radius: 8px; padding: 10px 18px; font-size: .9rem; cursor: pointer;
+}
+.action-btn:hover { border-color: var(--gold); color: var(--gold); }
+.action-btn.primary { background: var(--gold); color: #1b1b1b; border-color: var(--gold); font-weight: 700; }
+.action-btn.primary:hover { background: #ffe373; }
+.action-btn.large { font-size: 1.1rem; padding: 14px 28px; }
+
+/* ── Modals ──────────────────────────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+.modal.hidden { display: none; }
+.modal-box {
+  background: #161616;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+.modal-box h1 { font-size: 2.2rem; color: var(--gold); text-align: center; letter-spacing: 3px; margin-bottom: 4px; }
+.modal-box h2 { font-size: 1.25rem; color: #eee; margin-top: 0; }
+.subtitle { text-align: center; color: #888; font-size: .9rem; letter-spacing: 1.5px; margin-top: 0; }
+.start-desc { text-align: center; color: #ccc; font-size: .88rem; margin: 16px 0 20px; }
+.trade-label { font-size: .8rem; color: #999; margin: 10px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.modal-actions button:not(.action-btn) {
+  background: transparent; color: #999; border: 1px solid #444;
+  border-radius: 8px; padding: 10px 16px; cursor: pointer;
+}
+
+/* ── Confetti (win state) ───────────────────────────────────────────── */
+@keyframes confetti-cw {
+  0%   { transform: translateY(0) rotate(0deg);     opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(540deg);  opacity: 0; }
+}
+@keyframes confetti-ccw {
+  0%   { transform: translateY(0) rotate(0deg);     opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(-540deg); opacity: 0; }
+}
+.confetti-piece {
+  position: fixed;
+  top: -14px;
+  pointer-events: none;
+  z-index: 100;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  :root { --card-w: 84px; --card-h: 104px; }
+}
+@media (max-width: 430px) {
+  :root { --card-w: 68px; --card-h: 88px; --card-radius: 6px; }
+  #table { grid-template-rows: 1fr auto 1fr; }
+  .modal-actions { flex-direction: column; }
+  .action-btn.large { width: 100%; }
+}
