@@ -187,6 +187,40 @@ function buildLoadRow(player, seaShip) {
   return wrap;
 }
 
+// ── Turn/phase indicator ─────────────────────────────────────────────────
+
+const PHASE_LABELS = {
+  turnStart: 'Choosing: Set Sail or Home Port',
+  upgrade: 'Upgrade Phase',
+  defending: 'Defending Phase',
+  attack: 'Attack Phase',
+  shipsToSea: 'Ships-to-Sea Phase',
+  draw: 'Draw Phase',
+  homeport: 'Home Port',
+  gameover: 'Game Over',
+};
+
+function renderTurnIndicator() {
+  const el = $('turn-indicator');
+  const player = state.players[state.currentTurn];
+  if (!player) { el.innerHTML = ''; return; }
+
+  const phaseLabel = PHASE_LABELS[state.phase] || state.phase;
+  const isHumanTurn = player.isHuman;
+  el.classList.toggle('your-turn', isHumanTurn && state.phase !== 'gameover');
+
+  if (state.phase === 'gameover') {
+    el.innerHTML = `<span class="ti-phase">Game Over</span>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <span class="ti-turn">${isHumanTurn ? 'Your Turn' : `${player.name}'s Turn`}</span>
+    <span class="ti-sep">·</span>
+    <span class="ti-phase">${phaseLabel}</span>
+  `;
+}
+
 // ── Log ──────────────────────────────────────────────────────────────────
 
 function renderLog() {
@@ -380,6 +414,7 @@ function render() {
   if (!state.players.length) return;
   const human = state.players.find(p => p.isHuman);
   const ai = state.players.find(p => !p.isHuman);
+  renderTurnIndicator();
   renderPlayerShipZone($('zone-you'), human);
   renderPlayerShipZone($('zone-opponent'), ai);
   renderOcean();

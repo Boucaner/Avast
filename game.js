@@ -186,7 +186,10 @@ function beginRegularTurn() {
 }
 
 function advancePhase() {
-  const order = ['upgrade', 'defending', 'attack', 'shipsToSea', 'draw'];
+  // Defending temporarily skipped (Boss, 2026-08-18) — to be worked back in
+  // later. runDefendingPhase() and everything it depends on is untouched;
+  // re-add 'defending' here to restore it.
+  const order = ['upgrade', 'attack', 'shipsToSea', 'draw'];
   const i = order.indexOf(state.phase);
   const next = order[i + 1];
   state.phase = next;

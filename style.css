@@ -51,6 +51,24 @@ html, body {
 }
 #topbar-controls button:hover { border-color: var(--gold); color: var(--gold); }
 
+/* ── Turn/phase indicator ────────────────────────────────────────────── */
+#turn-indicator {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #161616;
+  border-bottom: 1px solid #262626;
+  font-size: .82rem;
+  letter-spacing: .3px;
+}
+#turn-indicator .ti-turn { color: #999; }
+#turn-indicator.your-turn .ti-turn { color: var(--green-light); font-weight: 700; }
+#turn-indicator .ti-phase { color: var(--gold); font-weight: 700; }
+#turn-indicator .ti-sep { color: #444; }
+
 /* ── Table ───────────────────────────────────────────────────────────── */
 #table {
   flex: 1;
