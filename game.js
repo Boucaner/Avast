@@ -18,6 +18,7 @@ const WIN_GOLD = 3000;        // placeholder win target — retune once Boss loc
 const MAX_HAND = 7;
 const HOME_PORT_TRIGGER_RATIO = 800; // AI: capture-pile value at which Home Port starts looking attractive
 const SHIPS_TO_SEA_CAP = 3;   // placeholder — rules leave this undecided ("maybe 3")
+const SHIPS_AT_SEA_CAP = 12;  // placeholder — total ships-at-sea, all owners combined, before the ocean is "full"
 
 function rollDie() { return 1 + Math.floor(Math.random() * 6); }
 
@@ -497,6 +498,7 @@ function runShipsToSeaEntry() {
 
 function putShipToSea(player, handShipUid) {
   if (player.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP) return null;
+  if (state.seaShips.length >= SHIPS_AT_SEA_CAP) return null;
   const handEntry = player.hand.find(c => c.uid === handShipUid && c.category === 'ship');
   if (!handEntry) return null;
   const seaShip = {
@@ -546,8 +548,10 @@ function loadSeaShip(player, seaShipId, handCardUid, faceUp) {
 }
 
 // Placing a ship is mandatory once per turn -- unless the player has no ship
-// card in hand to place, in which case the requirement is waived.
+// card in hand to place, or the ocean is already at its cap, in which case
+// the requirement is waived.
 function mustPlaceShip(player) {
+  if (state.seaShips.length >= SHIPS_AT_SEA_CAP) return false;
   return player.shipsToSeaThisTurn === 0 && player.hand.some(c => c.category === 'ship');
 }
 
@@ -751,7 +755,7 @@ function aiShipsToSeaPhase(player) {
     const shipCards = player.hand.filter(c => c.category === 'ship');
     putShipToSea(player, shipCards[0].uid);
   }
-  while (player.shipsToSeaThisTurn < SHIPS_TO_SEA_CAP) {
+  while (player.shipsToSeaThisTurn < SHIPS_TO_SEA_CAP && state.seaShips.length < SHIPS_AT_SEA_CAP) {
     const remaining = player.hand.filter(c => c.category === 'ship');
     if (!remaining.length || Math.random() >= 0.4) break;
     putShipToSea(player, remaining[0].uid);

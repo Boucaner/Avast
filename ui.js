@@ -121,6 +121,13 @@ function renderOcean() {
     return;
   }
 
+  if (state.seaShips.length >= SHIPS_AT_SEA_CAP) {
+    const p = document.createElement('div');
+    p.className = 'ocean-cap-note';
+    p.textContent = `Ocean is full (${state.seaShips.length}/${SHIPS_AT_SEA_CAP}).`;
+    oceanEl.appendChild(p);
+  }
+
   const inLoadMode = isHumanTurn && !state.pendingFlee && state.phase === 'shipsToSea';
 
   state.seaShips.forEach(seaShip => {
@@ -243,10 +250,11 @@ function renderHandAndActions() {
         btn.onclick = () => { buyUpgrade(human, entry.uid); render(); };
         wrap.appendChild(btn);
       } else if (state.phase === 'shipsToSea' && entry.category === 'ship') {
+        const oceanFull = state.seaShips.length >= SHIPS_AT_SEA_CAP;
         const btn = document.createElement('button');
         btn.className = 'mini-btn';
-        btn.textContent = `Put to Sea (${human.shipsToSeaThisTurn}/${SHIPS_TO_SEA_CAP})`;
-        btn.disabled = human.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP;
+        btn.textContent = oceanFull ? 'Ocean is full' : `Put to Sea (${human.shipsToSeaThisTurn}/${SHIPS_TO_SEA_CAP})`;
+        btn.disabled = oceanFull || human.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP;
         btn.onclick = () => {
           const created = putShipToSea(human, entry.uid);
           if (created) { uiActiveSeaShipId = created.id; uiSelectedHandUid = null; }
@@ -294,8 +302,11 @@ function renderHandAndActions() {
     addAction(actionsEl, 'Continue', () => { finishAttackPhase(); render(); });
   } else if (state.phase === 'shipsToSea') {
     const mustPlace = mustPlaceShip(human);
+    const oceanFull = state.seaShips.length >= SHIPS_AT_SEA_CAP;
     const hint = mustPlace
       ? 'You must put at least one ship out to sea this turn before continuing.'
+      : oceanFull
+      ? `The ocean is full (${SHIPS_AT_SEA_CAP} ships at sea) — no more can be put out until some are captured, sunk, or sold.`
       : activeShip
       ? `Loading the ${findCard(activeShip.shipId).name} — click a highlighted hand card, then Up or Down.`
       : 'Ships-to-Sea Phase — put a ship out, or click one of your ships at sea to load it from hand.';
