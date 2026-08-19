@@ -3,8 +3,8 @@
   --green:       #2d6a4f;
   --green-light: #40916c;
   --felt:        #1b4332;
-  --card-w:      110px;
-  --card-h:      130px;
+  --card-w:      80px;
+  --card-h:      100px;
   --card-radius: 8px;
   --red:         #c0392b;
   --gold:        #f4d03f;
@@ -119,7 +119,7 @@ html, body {
   padding: 10px;
   border: 1px solid rgba(255,255,255,.08);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
   align-content: start;
 }
@@ -285,12 +285,12 @@ html, body {
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  :root { --card-w: 84px; --card-h: 104px; }
+  :root { --card-w: 64px; --card-h: 84px; }
 }
 @media (max-width: 430px) {
-  :root { --card-w: 68px; --card-h: 88px; --card-radius: 6px; }
+  :root { --card-w: 52px; --card-h: 68px; --card-radius: 6px; }
   #table { grid-template-rows: minmax(0, 24vh) minmax(0, 1fr) minmax(0, 24vh); }
-  #ocean { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  #ocean { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .modal-actions { flex-direction: column; }
   .action-btn.large { width: 100%; }
 }
