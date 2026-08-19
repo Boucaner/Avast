@@ -161,10 +161,10 @@ function shuffle(deck) {
 }
 
 // ── Deck builder ─────────────────────────────────────────────────────────
-// Builds an identical-composition 60-card deck for a player (per Boss's
-// "identical mirrored decks" choice). Rules require >=1/4 ships; non-starter
-// crew are eligible (starters are drawn from outside the deck at setup).
-const DECK_SIZE = 60;
+// Builds an identical-composition deck for a player (per Boss's "identical
+// mirrored decks" choice). Ships live in their own separate pile/pool (see
+// buildShipPile) — everything else that has usable data goes in this deck.
+// Non-starter crew are eligible (starters are drawn from outside the deck).
 
 function buildDeck() {
   const deck = [];
@@ -175,10 +175,6 @@ function buildDeck() {
     }
   };
 
-  // Ships: every ship card, doubled, to comfortably clear the 1/4 quota (19*2=38 >= 15)
-  SHIPS.forEach(s => addCopies(s, 'ship', 2));
-
-  // One copy of everything else that has usable data
   CAPTAINS.forEach(c => addCopies(c, 'captain', 1));
   CREW.filter(c => !c.starter).forEach(c => addCopies(c, 'crew', 1));
   OFFICERS.forEach(c => addCopies(c, 'officer', 1));
@@ -187,6 +183,21 @@ function buildDeck() {
   TREASURE.forEach(c => addCopies(c, 'treasure', 1));
 
   return shuffle(deck);
+}
+
+// A player's personal ship pile/pool — every ship type, doubled. Ships that
+// leave play (sold, sunk, or lost in combat) shuffle back into this same
+// pile rather than going to the regular discard pile (see returnShipToPile
+// in game.js) — it's a self-circulating pool, not a draw-then-discard deck.
+function buildShipPile() {
+  const pile = [];
+  let seq = 0;
+  SHIPS.forEach(s => {
+    for (let i = 0; i < 2; i++) {
+      pile.push({ uid: `s${seq++}`, cardId: s.id, category: 'ship', faceUp: false });
+    }
+  });
+  return shuffle(pile);
 }
 
 function pickStarterShip() {

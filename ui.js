@@ -2,6 +2,25 @@
 
 const $ = id => document.getElementById(id);
 
+// Ships-to-Sea loading flow (UI-only selection state, not game state):
+// click one of your own ships-at-sea to make it the "active" load target,
+// which highlights eligible hand cards; click a highlighted card to reveal
+// its Up/Down buttons (click it again to hide them without committing);
+// Up/Down actually attaches it. Resets whenever we're not in that phase.
+let uiActiveSeaShipId = null;
+let uiSelectedHandUid = null;
+
+function loadEligibleHandCards(player, seaShip) {
+  return player.hand.filter(c => ['captain', 'crew', 'officer', 'upgrade', 'treasure', 'vip'].includes(c.category))
+    .filter(c => {
+      if (c.category === 'captain') return !seaShip.captain;
+      if (c.category === 'crew') return !seaShip.crew;
+      if (c.category === 'officer') return !seaShip.officer;
+      if (c.category === 'upgrade') return !seaShip.upgrades[findCard(c.cardId).slot];
+      return true; // treasure/vip always stackable
+    });
+}
+
 function cardStatLine(card) {
   if (card.atk != null) return `${card.atk}/${card.def}/${card.spd}`;
   if (card.bonus) {
@@ -102,11 +121,14 @@ function renderOcean() {
     return;
   }
 
+  const inLoadMode = isHumanTurn && !state.pendingFlee && state.phase === 'shipsToSea';
+
   state.seaShips.forEach(seaShip => {
     const owner = state.players[seaShip.ownerIdx];
     const isOwnShip = seaShip.ownerIdx === humanIdx;
+    const isActiveLoadTarget = inLoadMode && isOwnShip && uiActiveSeaShipId === seaShip.id;
     const card = document.createElement('div');
-    card.className = 'sea-ship';
+    card.className = 'sea-ship' + (isActiveLoadTarget ? ' load-target' : '');
 
     const header = document.createElement('div');
     header.className = 'sea-ship-header';
@@ -129,62 +151,21 @@ function renderOcean() {
         actions.appendChild(btn);
       }
     }
-    if (actions.childNodes.length) card.appendChild(actions);
-
-    if (isHumanTurn && !state.pendingFlee && state.phase === 'shipsToSea' && isOwnShip) {
-      const loadRow = buildLoadRow(human, seaShip);
-      if (loadRow) card.appendChild(loadRow);
+    if (inLoadMode && isOwnShip) {
+      const btn = document.createElement('button');
+      btn.className = 'mini-btn';
+      btn.textContent = isActiveLoadTarget ? 'Loading — click to deselect' : 'Load this ship';
+      btn.onclick = () => {
+        uiActiveSeaShipId = isActiveLoadTarget ? null : seaShip.id;
+        uiSelectedHandUid = null;
+        render();
+      };
+      actions.appendChild(btn);
     }
+    if (actions.childNodes.length) card.appendChild(actions);
 
     oceanEl.appendChild(card);
   });
-}
-
-function buildLoadRow(player, seaShip) {
-  const eligible = player.hand.filter(c => ['captain', 'crew', 'officer', 'upgrade', 'treasure', 'vip'].includes(c.category))
-    .filter(c => {
-      if (c.category === 'captain') return !seaShip.captain;
-      if (c.category === 'crew') return !seaShip.crew;
-      if (c.category === 'officer') return !seaShip.officer;
-      if (c.category === 'upgrade') return !seaShip.upgrades[findCard(c.cardId).slot];
-      return true; // treasure/vip always stackable
-    });
-  if (!eligible.length) return null;
-
-  const wrap = document.createElement('div');
-  wrap.className = 'load-row';
-  const label = document.createElement('div');
-  label.className = 'load-row-label';
-  label.textContent = 'Load from hand:';
-  wrap.appendChild(label);
-
-  const list = document.createElement('div');
-  list.className = 'load-candidates';
-  eligible.forEach(handEntry => {
-    const card = findCard(handEntry.cardId);
-    const item = document.createElement('div');
-    item.className = 'load-candidate';
-    const name = document.createElement('div');
-    name.className = 'mini-name';
-    name.textContent = card.name;
-    item.appendChild(name);
-    const row = document.createElement('div');
-    row.className = 'mini-btn-row';
-    const upBtn = document.createElement('button');
-    upBtn.className = 'mini-btn';
-    upBtn.textContent = 'Up';
-    upBtn.onclick = () => { loadSeaShip(player, seaShip.id, handEntry.uid, true); render(); };
-    const downBtn = document.createElement('button');
-    downBtn.className = 'mini-btn';
-    downBtn.textContent = 'Down';
-    downBtn.onclick = () => { loadSeaShip(player, seaShip.id, handEntry.uid, false); render(); };
-    row.appendChild(upBtn);
-    row.appendChild(downBtn);
-    item.appendChild(row);
-    list.appendChild(item);
-  });
-  wrap.appendChild(list);
-  return wrap;
 }
 
 // ── Turn/phase indicator ─────────────────────────────────────────────────
@@ -239,11 +220,19 @@ function renderHandAndActions() {
   handEl.innerHTML = '';
   actionsEl.innerHTML = '';
 
+  if (state.phase !== 'shipsToSea') { uiActiveSeaShipId = null; uiSelectedHandUid = null; }
+  const activeShip = uiActiveSeaShipId ? state.seaShips.find(s => s.id === uiActiveSeaShipId) : null;
+  if (!activeShip) uiActiveSeaShipId = null; // target got captured/sunk/lost since selection
+  const eligibleUids = activeShip ? new Set(loadEligibleHandCards(human, activeShip).map(c => c.uid)) : null;
+
   human.hand.forEach(entry => {
     const card = findCard(entry.cardId);
     const wrap = document.createElement('div');
-    wrap.className = 'hand-card-wrap';
-    wrap.appendChild(makeCardEl(card, entry.category));
+    const isLoadEligible = eligibleUids && eligibleUids.has(entry.uid);
+    const isSelected = uiSelectedHandUid === entry.uid;
+    wrap.className = 'hand-card-wrap' + (isLoadEligible ? ' load-eligible' : '') + (isSelected ? ' selected' : '');
+    const cardEl = makeCardEl(card, entry.category);
+    wrap.appendChild(cardEl);
 
     if (isHumanTurn && !state.pendingFlee) {
       if (state.phase === 'upgrade' && entry.category === 'upgrade') {
@@ -258,8 +247,29 @@ function renderHandAndActions() {
         btn.className = 'mini-btn';
         btn.textContent = `Put to Sea (${human.shipsToSeaThisTurn}/${SHIPS_TO_SEA_CAP})`;
         btn.disabled = human.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP;
-        btn.onclick = () => { putShipToSea(human, entry.uid); render(); };
+        btn.onclick = () => {
+          const created = putShipToSea(human, entry.uid);
+          if (created) { uiActiveSeaShipId = created.id; uiSelectedHandUid = null; }
+          render();
+        };
         wrap.appendChild(btn);
+      } else if (state.phase === 'shipsToSea' && isLoadEligible) {
+        if (isSelected) {
+          const row = document.createElement('div');
+          row.className = 'mini-btn-row';
+          const upBtn = document.createElement('button');
+          upBtn.className = 'mini-btn';
+          upBtn.textContent = 'Up';
+          upBtn.onclick = () => { loadSeaShip(human, activeShip.id, entry.uid, true); uiSelectedHandUid = null; render(); };
+          const downBtn = document.createElement('button');
+          downBtn.className = 'mini-btn';
+          downBtn.textContent = 'Down';
+          downBtn.onclick = () => { loadSeaShip(human, activeShip.id, entry.uid, false); uiSelectedHandUid = null; render(); };
+          row.appendChild(upBtn);
+          row.appendChild(downBtn);
+          wrap.appendChild(row);
+        }
+        cardEl.onclick = () => { uiSelectedHandUid = isSelected ? null : entry.uid; render(); };
       }
     }
     handEl.appendChild(wrap);
@@ -283,8 +293,26 @@ function renderHandAndActions() {
     actionsEl.appendChild(phaseNote('Attack Phase — attack any ship at sea (including your own), as many times as you keep winning.'));
     addAction(actionsEl, 'Continue', () => { finishAttackPhase(); render(); });
   } else if (state.phase === 'shipsToSea') {
-    actionsEl.appendChild(phaseNote('Ships-to-Sea Phase — put ships out from hand, load cargo onto your ships at sea, or continue.'));
-    addAction(actionsEl, 'Continue', () => { finishShipsToSea(); render(); });
+    const mustPlace = mustPlaceShip(human);
+    const hint = mustPlace
+      ? 'You must put at least one ship out to sea this turn before continuing.'
+      : activeShip
+      ? `Loading the ${findCard(activeShip.shipId).name} — click a highlighted hand card, then Up or Down.`
+      : 'Ships-to-Sea Phase — put a ship out, or click one of your ships at sea to load it from hand.';
+    actionsEl.appendChild(phaseNote(hint));
+    const btn = document.createElement('button');
+    btn.className = 'action-btn primary';
+    btn.textContent = 'Continue';
+    btn.disabled = mustPlace;
+    btn.onclick = () => { finishShipsToSea(); render(); };
+    actionsEl.appendChild(btn);
+  } else if (state.phase === 'draw') {
+    const remaining = SHIPS_TO_SEA_CAP - human.shipsDrawnThisTurn;
+    actionsEl.appendChild(phaseNote(`Drew a ship this turn. You may draw up to ${remaining} more from your ship pile before ending your turn.`));
+    if (remaining > 0 && human.shipDrawPile.length) {
+      addAction(actionsEl, `Draw Another Ship (${human.shipsDrawnThisTurn}/${SHIPS_TO_SEA_CAP})`, () => { humanDrawAnotherShip(); render(); });
+    }
+    addAction(actionsEl, 'End Turn', () => { finishDrawPhase(); render(); });
   }
 }
 

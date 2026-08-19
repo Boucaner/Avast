@@ -121,6 +121,8 @@ function makePlayer(name, isHuman) {
     drawPile: deck,
     discardPile: [],
     capturePile: [],
+    shipDrawPile: shuffle(buildShipPile()),
+    shipsDrawnThisTurn: 0,
     stash: 0,
     ship: newShipInstance(starterShipCard.id, starterCrewCard.id),
     shipsToSeaThisTurn: 0,
@@ -128,6 +130,7 @@ function makePlayer(name, isHuman) {
     firstTurnAfterLoss: false,
   };
   drawToHand(player, MAX_HAND);
+  for (let i = 0; i < 3; i++) drawOneShip(player, true); // starting hand must include 3 ships
   return player;
 }
 
@@ -141,6 +144,38 @@ function drawToHand(player, target) {
     }
     player.hand.push(player.drawPile.pop());
   }
+}
+
+// Ships are a separate, self-circulating pool (see buildShipPile in
+// cards.js): drawn straight into hand here, and returned directly to this
+// same pile (reshuffled) whenever a ship leaves play for any reason — sold,
+// sunk, or lost in combat — rather than going through discardPile/drawPile
+// like every other card type.
+function drawOneShip(player, silent) {
+  if (!player.shipDrawPile.length) return false;
+  const card = player.shipDrawPile.pop();
+  player.hand.push(card);
+  player.shipsDrawnThisTurn = (player.shipsDrawnThisTurn || 0) + 1;
+  if (!silent) log(`${player.name} draws a ship: ${findCard(card.cardId).name}.`);
+  return true;
+}
+
+function returnShipToPile(player, cardId) {
+  player.shipDrawPile.push({ uid: 'ship' + Math.random().toString(36).slice(2), cardId, category: 'ship', faceUp: false });
+  player.shipDrawPile = shuffle(player.shipDrawPile);
+}
+
+// Routes a batch of cards to wherever they belong when leaving a player's
+// possession: ships go back into that player's ship pile, everything else
+// goes to their regular discard pile.
+function discardCards(player, cards) {
+  cards.forEach(entry => {
+    if (entry.category === 'ship') {
+      returnShipToPile(player, entry.cardId);
+    } else {
+      player.discardPile.push(entry);
+    }
+  });
 }
 
 function opponentIndex(idx) { return (idx + 1) % state.players.length; }
@@ -240,23 +275,38 @@ function humanFleeChoice(attemptFlee) {
 // A ship-at-sea is captured (or sunk) into winnerPlayer's piles.
 function sinkOrCapture(winnerPlayer, shipObj) {
   const sinkRoll = rollDie();
-  const cards = [
-    { uid: 'ship-' + Math.random(), cardId: shipObj.shipId, category: 'ship' },
-    ...shipAttachments(shipObj).map(e => ({ uid: e.cardId + '-' + Math.random(), cardId: e.cardId, category: categoryOf(e.cardId) })),
-  ];
+  const attachmentCards = shipAttachments(shipObj).map(e => ({ uid: e.cardId + '-' + Math.random(), cardId: e.cardId, category: categoryOf(e.cardId) }));
   if (sinkRoll === 6) {
-    log(`${winnerPlayer.name} rolls a 6 — the prize sinks! Wreckage drifts into ${winnerPlayer.name}'s discard pile.`);
-    winnerPlayer.discardPile.push(...cards);
+    log(`${winnerPlayer.name} rolls a 6 — the prize sinks! Wreckage drifts into ${winnerPlayer.name}'s discard pile, and the ship itself returns to their ship pile.`);
+    returnShipToPile(winnerPlayer, shipObj.shipId);
+    winnerPlayer.discardPile.push(...attachmentCards);
   } else {
     log(`${winnerPlayer.name} rolls ${sinkRoll} — the ship is theirs. Added to the capture pile.`);
+    const cards = [{ uid: 'ship-' + Math.random(), cardId: shipObj.shipId, category: 'ship' }, ...attachmentCards];
     winnerPlayer.capturePile.push(...cards);
   }
 }
 
 // A player's own ship is lost (they lost a combat they were party to).
+// Everything on it — including the ship card itself — actually leaves play:
+// the ship returns to the player's own ship pile (unless it was their
+// starter, which was never drawn from a pile in the first place), and its
+// other attachments go to the discard pile, matching the "discard current
+// ship and all cards on it (unless starter)" rule.
 function playerLosesShip(player) {
-  player.discardPile.push(...player.capturePile);
+  discardCards(player, player.capturePile);
   player.capturePile = [];
+
+  const oldShip = player.ship;
+  if (oldShip.shipId !== player.starterShipId) returnShipToPile(player, oldShip.shipId);
+  const leftovers = [];
+  if (oldShip.captain) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.captain.cardId, category: 'captain' });
+  if (oldShip.crew && oldShip.crew.cardId !== player.starterCrewId) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.crew.cardId, category: 'crew' });
+  if (oldShip.officer) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.officer.cardId, category: 'officer' });
+  ['cannon', 'sails', 'hull'].forEach(slot => { if (oldShip.upgrades[slot]) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.upgrades[slot].cardId, category: 'upgrade' }); });
+  oldShip.cargo.forEach(c => leftovers.push({ uid: 'disc' + Math.random(), cardId: c.cardId, category: categoryOf(c.cardId) }));
+  player.discardPile.push(...leftovers);
+
   player.ship = newShipInstance(player.starterShipId, player.starterCrewId);
   player.firstTurnAfterLoss = true;
   if (player === state.players[state.currentTurn]) {
@@ -446,9 +496,9 @@ function runShipsToSeaEntry() {
 }
 
 function putShipToSea(player, handShipUid) {
-  if (player.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP) return false;
+  if (player.shipsToSeaThisTurn >= SHIPS_TO_SEA_CAP) return null;
   const handEntry = player.hand.find(c => c.uid === handShipUid && c.category === 'ship');
-  if (!handEntry) return false;
+  if (!handEntry) return null;
   const seaShip = {
     id: 'sea' + Math.random().toString(36).slice(2),
     ownerIdx: state.players.indexOf(player),
@@ -461,7 +511,7 @@ function putShipToSea(player, handShipUid) {
   player.hand = player.hand.filter(c => c.uid !== handShipUid);
   player.shipsToSeaThisTurn++;
   log(`${player.name} puts the ${findCard(seaShip.shipId).name} out to sea.`);
-  return true;
+  return seaShip;
 }
 
 function loadSeaShip(player, seaShipId, handCardUid, faceUp) {
@@ -495,17 +545,48 @@ function loadSeaShip(player, seaShipId, handCardUid, faceUp) {
   return true;
 }
 
+// Placing a ship is mandatory once per turn -- unless the player has no ship
+// card in hand to place, in which case the requirement is waived.
+function mustPlaceShip(player) {
+  return player.shipsToSeaThisTurn === 0 && player.hand.some(c => c.category === 'ship');
+}
+
 function finishShipsToSea() {
+  if (mustPlaceShip(state.players[state.currentTurn])) return false;
   advancePhase();
+  return true;
 }
 
 // ── Draw phase ───────────────────────────────────────────────────────────
+// Refill the regular hand, then draw a ship (mandatory, if the pile has one)
+// with up to SHIPS_TO_SEA_CAP total allowed this turn -- extra ships beyond
+// the first are optional, for next turn's Ships-to-Sea Phase to use.
 
 function runDrawPhase() {
   state.phase = 'draw';
   const player = state.players[state.currentTurn];
   drawToHand(player, MAX_HAND);
   if (player.hand.length > MAX_HAND) player.hand = player.hand.slice(0, MAX_HAND);
+
+  player.shipsDrawnThisTurn = 0;
+  drawOneShip(player);
+
+  if (!player.isHuman) {
+    while (player.shipsDrawnThisTurn < SHIPS_TO_SEA_CAP && player.shipDrawPile.length && Math.random() < 0.4) {
+      drawOneShip(player);
+    }
+    return endTurn();
+  }
+  // human: ui.js shows "Draw Another Ship" / "End Turn"
+}
+
+function humanDrawAnotherShip() {
+  const player = state.players[state.currentTurn];
+  if (player.shipsDrawnThisTurn >= SHIPS_TO_SEA_CAP) return false;
+  return drawOneShip(player);
+}
+
+function finishDrawPhase() {
   endTurn();
 }
 
@@ -528,7 +609,8 @@ function doHomePort(player, shipChoice) {
     chosenCaptureEntry = player.capturePile.find(e => e.uid === shipChoice.uid && e.category === 'ship');
   }
 
-  // 1) Sell capture pile (excluding a ship being kept to sail with)
+  // 1) Sell capture pile (excluding a ship being kept to sail with) -- any
+  // ship cards among the sold cards return to the ship pile, not discardPile
   let earned = 0;
   const toSell = player.capturePile.filter(e => e !== chosenCaptureEntry);
   toSell.forEach(entry => {
@@ -537,7 +619,7 @@ function doHomePort(player, shipChoice) {
   });
   if (earned > 0) log(`${player.name} sells their haul for ${earned} gold.`);
   player.stash += earned;
-  player.discardPile.push(...toSell);
+  discardCards(player, toSell);
   player.capturePile = chosenCaptureEntry ? [chosenCaptureEntry] : [];
 
   // 2) Pay crew/officer upkeep on the outgoing ship
@@ -557,9 +639,23 @@ function doHomePort(player, shipChoice) {
   if (outgoingShip.crew) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.crew.cardId, category: 'crew' });
   if (outgoingShip.officer) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.officer.cardId, category: 'officer' });
 
-  // 3) Choose next ship
+  // 3) Choose next ship. Whenever the ship is actually being replaced, the
+  // outgoing one truly leaves play: its own card returns to the ship pile
+  // (unless it was the starter, which never came from a pile), and whatever
+  // was still attached to it (captain/upgrades/cargo) goes to the discard
+  // pile rather than silently vanishing.
+  function releaseOutgoingShip() {
+    if (outgoingShip.shipId !== player.starterShipId) returnShipToPile(player, outgoingShip.shipId);
+    const leftovers = [];
+    if (outgoingShip.captain) leftovers.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.captain.cardId, category: 'captain' });
+    ['cannon', 'sails', 'hull'].forEach(slot => { if (outgoingShip.upgrades[slot]) leftovers.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.upgrades[slot].cardId, category: 'upgrade' }); });
+    outgoingShip.cargo.forEach(c => leftovers.push({ uid: 'disc' + Math.random(), cardId: c.cardId, category: categoryOf(c.cardId) }));
+    player.discardPile.push(...leftovers);
+  }
+
   if (forcedStarter) {
-    if (chosenCaptureEntry) { player.discardPile.push(chosenCaptureEntry); player.capturePile = []; }
+    if (chosenCaptureEntry) { returnShipToPile(player, chosenCaptureEntry.cardId); player.capturePile = []; }
+    releaseOutgoingShip();
     player.ship = newShipInstance(player.starterShipId, player.starterCrewId);
   } else if (shipChoice && shipChoice.source === 'hand') {
     const handEntry = player.hand.find(c => c.uid === shipChoice.uid && c.category === 'ship');
@@ -567,6 +663,7 @@ function doHomePort(player, shipChoice) {
     if (card && player.stash >= card.value) {
       player.stash -= card.value;
       player.hand = player.hand.filter(c => c.uid !== shipChoice.uid);
+      releaseOutgoingShip();
       player.ship = newShipInstance(card.id);
       log(`${player.name} buys the ${card.name} for ${card.value} gold.`);
     } else {
@@ -574,6 +671,7 @@ function doHomePort(player, shipChoice) {
       outgoingShip.officer = null;
     }
   } else if (chosenCaptureEntry) {
+    releaseOutgoingShip();
     player.ship = newShipInstance(chosenCaptureEntry.cardId);
     player.capturePile = [];
     log(`${player.name} takes the captured ${findCard(chosenCaptureEntry.cardId).name} as their new ship.`);
@@ -647,9 +745,16 @@ function totalBonus(bonus) {
 }
 
 function aiShipsToSeaPhase(player) {
-  const shipCards = player.hand.filter(c => c.category === 'ship');
-  if (shipCards.length && player.shipsToSeaThisTurn < SHIPS_TO_SEA_CAP && Math.random() < 0.6) {
+  // Placing at least one ship is mandatory (if available) -- always taken,
+  // not probabilistic. Extra ships beyond the mandatory first are optional.
+  if (mustPlaceShip(player)) {
+    const shipCards = player.hand.filter(c => c.category === 'ship');
     putShipToSea(player, shipCards[0].uid);
+  }
+  while (player.shipsToSeaThisTurn < SHIPS_TO_SEA_CAP) {
+    const remaining = player.hand.filter(c => c.category === 'ship');
+    if (!remaining.length || Math.random() >= 0.4) break;
+    putShipToSea(player, remaining[0].uid);
   }
   const ownIdx = state.players.indexOf(player);
   const ownShips = state.seaShips.filter(s => s.ownerIdx === ownIdx);
