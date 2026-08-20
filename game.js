@@ -346,7 +346,7 @@ function runDefendingPhase() {
 
   const defenderShip = player.ship;
   const afterDone = () => {
-    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; return runDrawPhase(); }
+    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
     advancePhase();
   };
 
@@ -395,11 +395,12 @@ function runDefendingPhase() {
 
 // ── Attack phase ─────────────────────────────────────────────────────────
 // Players may attack any ship-at-sea, including their own, as long as they
-// keep winning. A loss ends the turn immediately (Losing Combat).
+// keep winning. A loss skips straight to Ships-to-Sea (still mandatory)
+// and then Draw — no further attacks, upgrades, etc. this turn.
 
 function runAttackPhaseEntry() {
   const player = state.players[state.currentTurn];
-  if (state.turnEndedByLoss) { state.turnEndedByLoss = false; return runDrawPhase(); }
+  if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
   if (!state.seaShips.length) {
     return advancePhase();
   }
@@ -460,7 +461,7 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
 
 function humanAttack(seaShipId) {
   attackSeaShip(state.currentTurn, seaShipId, () => {
-    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; return runDrawPhase(); }
+    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
     // stays in Attack phase — ui.js re-renders so they can attack again or continue
   });
 }
@@ -472,7 +473,7 @@ function aiTakeAttackTurn(playerIdx) {
     return advancePhase();
   }
   attackSeaShip(playerIdx, target.id, () => {
-    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; return runDrawPhase(); }
+    if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
     if (state.seaShips.length && Math.random() < 0.5) return aiTakeAttackTurn(playerIdx);
     advancePhase();
   });
