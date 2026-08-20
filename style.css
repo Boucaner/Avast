@@ -70,44 +70,49 @@ html, body {
 #turn-indicator .ti-sep { color: #444; }
 
 /* ── Table ───────────────────────────────────────────────────────────────
-   Named grid areas so this reads as a real table: the ocean owns the
-   center and is the dominant area; player zones dock to the edges. Only
-   top/bottom are used for the current 2-player game, but left/right are
-   named and ready for whenever more player seats are needed — adding one
-   is then just another grid-template-areas row + a docked zone element,
-   not a re-architecture. ────────────────────────────────────────────── */
+   Named grid areas so this reads as a real table. Desktop/wide: player
+   zones are narrow rails on the left/right, ocean takes the full height
+   and most of the width — uses the screen's actual shape better than
+   stacking three horizontal bands. Narrow viewports fall back to the
+   old top/center/bottom stacking (see the responsive block at the
+   bottom of this file), since side-by-side rails don't have room on a
+   phone. Same #zone-opponent/#ocean/#zone-you elements either way, just
+   different grid-template-areas/columns/rows. ───────────────────────── */
 #table {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-areas: "top" "center" "bottom";
-  grid-template-rows: minmax(0, 26vh) minmax(0, 1fr) minmax(0, 26vh);
+  grid-template-areas: "left center right";
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr) minmax(0, 190px);
+  grid-template-rows: minmax(0, 1fr);
   gap: 8px;
   padding: 10px;
   background: radial-gradient(ellipse at center, var(--green-light) 0%, var(--felt) 60%, #0f2418 100%);
   overflow: hidden;
 }
-#zone-opponent { grid-area: top; }
+#zone-opponent { grid-area: left; }
 #ocean { grid-area: center; }
-#zone-you { grid-area: bottom; }
+#zone-you { grid-area: right; }
 
 .ship-zone {
+  min-width: 0;
   background: rgba(0,0,0,.25);
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border: 1px solid rgba(255,255,255,.08);
   min-height: 0;
   overflow-y: auto;
 }
 .ship-header {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  gap: 4px;
   margin-bottom: 8px;
 }
 .ship-name { font-weight: 700; font-size: 1.05rem; color: #fff; }
 .ship-rating { color: var(--gold); font-variant-numeric: tabular-nums; font-size: .95rem; }
 .ship-slots { display: flex; flex-wrap: wrap; gap: 8px; min-height: calc(var(--card-h) * 0.5); }
 .ship-econ {
-  display: flex; gap: 16px; flex-wrap: wrap;
+  display: flex; flex-direction: column; gap: 4px;
   margin-top: 8px; font-size: .78rem; color: #bbb;
 }
 
@@ -284,12 +289,25 @@ html, body {
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
+/* Side-by-side rails don't have room on narrower screens -- fall back to
+   the old top/center/bottom stacking. Same elements, different areas. */
+@media (max-width: 780px) {
+  #table {
+    grid-template-areas: "top" "center" "bottom";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(120px, 1fr) auto;
+  }
+  #zone-opponent { grid-area: top; }
+  #ocean { grid-area: center; }
+  #zone-you { grid-area: bottom; }
+  .ship-zone { max-height: 30vh; }
+}
 @media (max-width: 600px) {
   :root { --card-w: 64px; --card-h: 84px; }
 }
 @media (max-width: 430px) {
   :root { --card-w: 52px; --card-h: 68px; --card-radius: 6px; }
-  #table { grid-template-rows: minmax(0, 24vh) minmax(0, 1fr) minmax(0, 24vh); }
+  .ship-zone { max-height: 26vh; }
   #ocean { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .modal-actions { flex-direction: column; }
   .action-btn.large { width: 100%; }
