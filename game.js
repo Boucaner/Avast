@@ -101,8 +101,20 @@ function shipIsPirateType(ship) {
   return false;
 }
 
+// A card "affects combat" if it carries an atk/def/spd bonus -- most
+// captains, VIPs, and plain cargo (Gold Coins, Spyglass, Cotton, etc.) don't.
+function cardAffectsCombat(card) {
+  if (!card || !card.bonus) return false;
+  return ['atk', 'def', 'spd'].some(k => card.bonus[k] !== undefined);
+}
+
+// When a ship enters combat, only face-down cards that actually affect
+// combat get turned up -- a face-down VIP or a non-bonus captain has
+// nothing to reveal for combat purposes and stays hidden.
 function flipShipFaceUp(ship) {
-  shipAttachments(ship).forEach(entry => { entry.faceUp = true; });
+  shipAttachments(ship).forEach(entry => {
+    if (cardAffectsCombat(findCard(entry.cardId))) entry.faceUp = true;
+  });
 }
 
 // ── Setup ────────────────────────────────────────────────────────────────
