@@ -131,8 +131,12 @@ function renderOcean() {
   const inLoadMode = isHumanTurn && !state.pendingFlee && state.phase === 'shipsToSea';
 
   state.seaShips.forEach(seaShip => {
-    const owner = state.players[seaShip.ownerIdx];
     const isOwnShip = seaShip.ownerIdx === humanIdx;
+    // Loading is only ever offered in the same action as placing a ship
+    // (see putShipToSea's auto-select in renderHandAndActions) -- ships
+    // are never manually re-selectable as a load target here. Which ship
+    // is whose isn't shown at all: it's on the player to remember what
+    // they put out, same as they can't re-check a face-down card.
     const isActiveLoadTarget = inLoadMode && isOwnShip && uiActiveSeaShipId === seaShip.id;
     const card = document.createElement('div');
     card.className = 'sea-ship' + (isActiveLoadTarget ? ' load-target' : '');
@@ -140,8 +144,7 @@ function renderOcean() {
     const header = document.createElement('div');
     header.className = 'sea-ship-header';
     header.innerHTML = `
-      <span><span class="sea-ship-owner">${owner.name}'s ship</span><br>
-      <span class="sea-ship-name">${findCard(seaShip.shipId).name}</span></span>
+      <span class="sea-ship-name">${findCard(seaShip.shipId).name}</span>
       <span class="sea-ship-rating">${shipRating(seaShip, 'atk')}/${shipRating(seaShip, 'def')}/${shipRating(seaShip, 'spd')}</span>
     `;
     card.appendChild(header);
@@ -157,17 +160,6 @@ function renderOcean() {
         btn.onclick = () => { humanAttack(seaShip.id); render(); };
         actions.appendChild(btn);
       }
-    }
-    if (inLoadMode && isOwnShip) {
-      const btn = document.createElement('button');
-      btn.className = 'mini-btn';
-      btn.textContent = isActiveLoadTarget ? 'Loading — click to deselect' : 'Load this ship';
-      btn.onclick = () => {
-        uiActiveSeaShipId = isActiveLoadTarget ? null : seaShip.id;
-        uiSelectedHandUid = null;
-        render();
-      };
-      actions.appendChild(btn);
     }
     if (actions.childNodes.length) card.appendChild(actions);
 

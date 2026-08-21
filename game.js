@@ -752,18 +752,24 @@ function totalBonus(bonus) {
 function aiShipsToSeaPhase(player) {
   // Placing at least one ship is mandatory (if available) -- always taken,
   // not probabilistic. Extra ships beyond the mandatory first are optional.
+  // Loading (captain/crew/officer/cargo) is only ever offered in the same
+  // action as placing a ship -- once a ship is out there, it can't be
+  // altered except by a card that explicitly allows it. So only ships
+  // placed in this call are eligible for loading below, never ones
+  // already sitting in the ocean from an earlier turn.
+  const placedThisTurn = [];
   if (mustPlaceShip(player)) {
     const shipCards = player.hand.filter(c => c.category === 'ship');
-    putShipToSea(player, shipCards[0].uid);
+    const s = putShipToSea(player, shipCards[0].uid);
+    if (s) placedThisTurn.push(s);
   }
   while (player.shipsToSeaThisTurn < SHIPS_TO_SEA_CAP && state.seaShips.length < SHIPS_AT_SEA_CAP) {
     const remaining = player.hand.filter(c => c.category === 'ship');
     if (!remaining.length || Math.random() >= 0.4) break;
-    putShipToSea(player, remaining[0].uid);
+    const s = putShipToSea(player, remaining[0].uid);
+    if (s) placedThisTurn.push(s);
   }
-  const ownIdx = state.players.indexOf(player);
-  const ownShips = state.seaShips.filter(s => s.ownerIdx === ownIdx);
-  ownShips.forEach(seaShip => {
+  placedThisTurn.forEach(seaShip => {
     ['captain', 'crew', 'officer'].forEach(slot => {
       if (seaShip[slot]) return;
       const candidates = player.hand.filter(c => c.category === slot);
