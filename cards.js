@@ -201,8 +201,10 @@ function buildShipPile() {
 }
 
 function pickStarterShip() {
-  // Any ship whose atk+def+spd totals 7 or less
-  const eligible = SHIPS.filter(s => s.atk + s.def + s.spd <= 7);
+  // Any ship whose atk+def+spd totals 9 or less (bumped from 7, Boss
+  // 2026-08-21 -- starter-mode combat was too weak, see the win-rate data
+  // in that day's notes).
+  const eligible = SHIPS.filter(s => s.atk + s.def + s.spd <= 9);
   return eligible[Math.floor(Math.random() * eligible.length)];
 }
 
