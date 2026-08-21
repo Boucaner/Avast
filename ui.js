@@ -102,6 +102,7 @@ function renderPlayerShipZone(zoneEl, player) {
   stats.innerHTML = `
     <span>Stash: <strong>${player.stash}g</strong></span>
     <span>Capture pile: ${player.capturePile.length} card${player.capturePile.length === 1 ? '' : 's'} (~${captureValue}g)</span>
+    <span>Discard: ${player.discardPile.length} card${player.discardPile.length === 1 ? '' : 's'}</span>
     <span>Hand: ${player.hand.length}</span>
   `;
   zoneEl.appendChild(stats);
@@ -394,6 +395,21 @@ function openHomePortModal() {
 
   if (!shipCardsInHand.length && !shipCardsInCapture.length) {
     shipChoices.innerHTML = '<p class="phase-note">No alternative ships available — keep your current ship.</p>';
+  }
+
+  // Discard pile is otherwise invisible during play (no interaction with it
+  // yet -- may add the ability to open/use it later) -- Home Port is where
+  // it becomes visible, read-only, per Boss (2026-08-21).
+  $('homeport-discard-label').textContent = `Your discard pile (${human.discardPile.length} card${human.discardPile.length === 1 ? '' : 's'}):`;
+  const discardEl = $('homeport-discard-pile');
+  discardEl.innerHTML = '';
+  if (human.discardPile.length) {
+    human.discardPile.forEach(entry => {
+      const card = findCard(entry.cardId);
+      if (card) discardEl.appendChild(makeCardEl(card, entry.category));
+    });
+  } else {
+    discardEl.innerHTML = '<p class="phase-note">Empty.</p>';
   }
 
   $('modal-homeport').classList.remove('hidden');
