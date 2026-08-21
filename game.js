@@ -498,10 +498,13 @@ function resolveCounterAttack(attacker, seaShip, onDone) {
   const defTotal = shipRating(attackerShip, 'def') + defRoll;
   log(`Counter-attack: ${possessive(ownerName)} ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')}+${defRoll}=${defTotal}.`);
 
-  if (atkTotal >= defTotal) {
+  if (atkTotal > defTotal) {
     log(`${possessive(attacker.name)} ship is overwhelmed!`);
     playerLosesShip(attacker);
   } else {
+    // A tie sends both ships on their way, same as the attacker clearly
+    // winning the counter (Boss, 2026-08-21) -- the sea ship needs to
+    // strictly beat the attacker's defense to land the counter-attack.
     log(`${possessive(attacker.name)} ship fights free! Both ships break off — ${possessive(attacker.name)} attack phase ends.`);
     advancePhase();
   }
