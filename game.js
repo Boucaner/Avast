@@ -454,13 +454,12 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
     log(`Combat: ${possessive(attacker.name)} attack ${shipRating(attackerShip, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(ownerName)} ${findCard(seaShip.shipId).name} defense ${shipRating(seaShip, 'def') - defPenalty}+${defRoll}=${defTotal}.`);
 
     if (defTotal >= atkTotal) {
-      log(`${possessive(ownerName)} ${findCard(seaShip.shipId).name} holds them off! ${possessive(attacker.name)} ship is lost in the exchange.`);
-      playerLosesShip(attacker);
-    } else {
-      log(`${attacker.name} wins the exchange and captures ${possessive(ownerName)} ${findCard(seaShip.shipId).name}!`);
-      state.seaShips = state.seaShips.filter(s => s.id !== seaShipId);
-      sinkOrCapture(attacker, seaShip);
+      log(`${possessive(ownerName)} ${findCard(seaShip.shipId).name} holds them off!`);
+      return resolveCounterAttack(attacker, seaShip, onDone);
     }
+    log(`${attacker.name} wins the exchange and captures ${possessive(ownerName)} ${findCard(seaShip.shipId).name}!`);
+    state.seaShips = state.seaShips.filter(s => s.id !== seaShipId);
+    sinkOrCapture(attacker, seaShip);
     onDone && onDone();
   };
 
@@ -481,10 +480,41 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
   }
 }
 
+// When the original attacker loses the first exchange, the defending ship
+// counter-attacks instead of the attacker's ship being lost outright. Fresh
+// rolls, same combat math, roles reversed -- but no flee option for the
+// original attacker: being the aggressor locks you into this fight (Boss,
+// 2026-08-21). If the counter-attack lands, the attacker's ship is sunk
+// (same mechanic as any other ship loss). If the attacker fights it off,
+// nothing is captured or lost either way -- both ships break off, and the
+// attacker's Attack phase ends immediately, win or not, even if they had
+// more attacks available this turn.
+function resolveCounterAttack(attacker, seaShip, onDone) {
+  const ownerName = state.players[seaShip.ownerIdx].name;
+  const attackerShip = attacker.ship;
+
+  const atkRoll = rollDie(), defRoll = rollDie();
+  const atkTotal = shipRating(seaShip, 'atk') + atkRoll;
+  const defTotal = shipRating(attackerShip, 'def') + defRoll;
+  log(`Counter-attack: ${possessive(ownerName)} ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')}+${defRoll}=${defTotal}.`);
+
+  if (atkTotal >= defTotal) {
+    log(`${possessive(attacker.name)} ship is overwhelmed!`);
+    playerLosesShip(attacker);
+  } else {
+    log(`${possessive(attacker.name)} ship fights free! Both ships break off — ${possessive(attacker.name)} attack phase ends.`);
+    advancePhase();
+  }
+  onDone && onDone();
+}
+
 function humanAttack(seaShipId) {
   attackSeaShip(state.currentTurn, seaShipId, () => {
     if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
-    // stays in Attack phase — ui.js re-renders so they can attack again or continue
+    // Otherwise nothing to do here -- either still in Attack phase (attack
+    // again or Continue) or a counter-attack standoff already advanced to
+    // Ships-to-Sea itself. Either way ui.js's render() reflects whatever
+    // state.phase actually is now.
   });
 }
 
@@ -503,6 +533,7 @@ function aiAttackStep(playerIdx) {
   }
   attackSeaShip(playerIdx, target.id, () => {
     if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
+    if (state.phase !== 'attack') return; // a counter-attack standoff already advanced the phase
     if (!(state.seaShips.length && Math.random() < 0.5)) advancePhase();
     // else: stay in 'attack' phase -- ui.js will call aiAttackStep again
     // after a delay for a possible follow-up attack.
