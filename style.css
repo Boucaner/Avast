@@ -8,6 +8,7 @@
   --card-radius: 8px;
   --red:         #c0392b;
   --gold:        #f4d03f;
+  --turn-marker: #5dade2;
   --shadow:      0 4px 12px rgba(0,0,0,.5);
 }
 
@@ -160,6 +161,10 @@ html, body {
 }
 .log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
 .log-line:last-child { color: var(--gold); font-weight: 600; }
+/* Marks the start of each player's turn so it's easy to spot while
+   scrolling the log. Other kinds (e.g. combat) may get their own color
+   later -- kind is an open set, see log()'s kind param in game.js. */
+.log-line--turn-start { color: var(--turn-marker); font-weight: 600; }
 
 /* ── Cards ───────────────────────────────────────────────────────────── */
 .card {

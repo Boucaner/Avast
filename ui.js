@@ -211,7 +211,7 @@ function renderTurnIndicator() {
 
 function renderLog() {
   const el = $('log');
-  el.innerHTML = state.log.map(l => `<div class="log-line">${l}</div>`).join('');
+  el.innerHTML = state.log.map(l => `<div class="log-line log-line--${l.kind}">${l.text}</div>`).join('');
   el.scrollTop = el.scrollHeight;
 }
 
@@ -321,7 +321,7 @@ function renderHandAndActions() {
     if (remaining > 0 && human.shipDrawPile.length) {
       addAction(actionsEl, `Draw Another Ship (${human.shipsDrawnThisTurn}/${SHIPS_TO_SEA_CAP})`, () => { humanDrawAnotherShip(); render(); });
     }
-    addAction(actionsEl, 'End Turn', () => { finishDrawPhase(); render(); });
+    addAction(actionsEl, 'End Turn', () => { finishDrawPhase(); render(); scheduleAiIfNeeded(); });
   }
 }
 
@@ -377,6 +377,7 @@ function openHomePortModal() {
       $('modal-homeport').classList.add('hidden');
       doHomePort(human, { source: 'hand', uid: entry.uid });
       render();
+      scheduleAiIfNeeded();
     });
   });
 
@@ -387,6 +388,7 @@ function openHomePortModal() {
       $('modal-homeport').classList.add('hidden');
       doHomePort(human, { source: 'capture', uid: entry.uid });
       render();
+      scheduleAiIfNeeded();
     });
   });
 
@@ -445,6 +447,48 @@ function showConfetti() {
   }
 }
 
+// ── AI turn pacing ───────────────────────────────────────────────────────
+// game.js's phase functions apply an AI's action for the CURRENT phase and
+// then stop (they no longer self-chain into the next phase) -- this loop
+// drives the AI's turn one visible step at a time via setTimeout, calling
+// render() after each step so the player watches it unfold instead of
+// seeing only the end result. Mirrors the pacing pattern used in Spite and
+// Malice / President Game: ui.js owns all timing, game.js stays pure sync.
+const AI_STEP_DELAY_MS = 700;
+
+function scheduleAiIfNeeded() {
+  const cur = state.players[state.currentTurn];
+  if (!cur || cur.isHuman || state.phase === 'gameover') return;
+  setTimeout(runAiStep, AI_STEP_DELAY_MS);
+}
+
+function runAiStep() {
+  const cur = state.players[state.currentTurn];
+  if (!cur || cur.isHuman || state.phase === 'gameover') { render(); return; }
+
+  if (state.phase === 'turnStart') {
+    if (aiWantsHomePort(cur)) {
+      doHomePort(cur, aiChooseHomePortShip(cur));
+    } else {
+      beginRegularTurn();
+    }
+  } else if (state.phase === 'upgrade') {
+    aiUpgradePhase(cur);
+    advancePhase();
+  } else if (state.phase === 'attack') {
+    aiAttackStep(state.currentTurn);
+  } else if (state.phase === 'shipsToSea') {
+    aiShipsToSeaPhase(cur);
+    advancePhase();
+  }
+  // 'draw' phase for AI resolves fully (including endTurn()) inside
+  // runDrawPhase, reached via the advancePhase() call above -- nothing left
+  // to do here for that phase.
+
+  render();
+  scheduleAiIfNeeded();
+}
+
 // ── Top-level render ────────────────────────────────────────────────────
 
 function render() {
@@ -470,6 +514,7 @@ function startNewGame() {
   initGame();
   startTurn();
   render();
+  scheduleAiIfNeeded();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -482,9 +527,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('modal-homeport').classList.add('hidden');
     doHomePort(human);
     render();
+    scheduleAiIfNeeded();
   };
   $('btn-homeport-cancel').onclick = () => { $('modal-homeport').classList.add('hidden'); };
 
-  $('btn-flee-attempt').onclick = () => { humanFleeChoice(true); render(); };
-  $('btn-flee-stand').onclick = () => { humanFleeChoice(false); render(); };
+  $('btn-flee-attempt').onclick = () => { humanFleeChoice(true); render(); scheduleAiIfNeeded(); };
+  $('btn-flee-stand').onclick = () => { humanFleeChoice(false); render(); scheduleAiIfNeeded(); };
 });

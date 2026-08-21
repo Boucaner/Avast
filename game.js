@@ -39,8 +39,12 @@ const state = {
   winner: null,
 };
 
-function log(msg) {
-  state.log.push(msg);
+// kind tags a line for styling in ui.js (e.g. 'turn-start') -- defaults to
+// plain. Kept as a small open set of string tags rather than an enum so new
+// categories (combat, capture, etc.) can be added later without touching
+// every existing log() call site.
+function log(msg, kind) {
+  state.log.push({ text: msg, kind: kind || 'default' });
   if (state.log.length > 200) state.log.shift();
 }
 
@@ -228,23 +232,16 @@ function categoryOf(cardId) {
 function startTurn() {
   const player = state.players[state.currentTurn];
   state.phase = 'turnStart';
-  if (!player.isHuman) {
-    if (aiWantsHomePort(player)) {
-      doHomePort(player, aiChooseHomePortShip(player));
-    } else {
-      beginRegularTurn();
-    }
-  }
+  log(`${possessive(player.name)} turn begins.`, 'turn-start');
   // human: ui.js shows the Set Sail / Home Port choice
+  // AI: ui.js's paced stepper (runAiStep) decides Home Port vs. a regular
+  // turn and drives every subsequent phase, one visible step at a time --
+  // nothing AI-related happens synchronously from here.
 }
 
 function beginRegularTurn() {
-  const player = state.players[state.currentTurn];
   state.phase = 'upgrade';
-  if (!player.isHuman) {
-    aiUpgradePhase(player);
-    advancePhase();
-  }
+  // AI's upgrade action itself is applied by ui.js's paced stepper.
 }
 
 function advancePhase() {
@@ -425,13 +422,12 @@ function runDefendingPhase() {
 // and then Draw — no further attacks, upgrades, etc. this turn.
 
 function runAttackPhaseEntry() {
-  const player = state.players[state.currentTurn];
   if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
   if (!state.seaShips.length) {
     return advancePhase();
   }
-  if (!player.isHuman) return aiTakeAttackTurn(state.currentTurn);
   // human: ui.js shows targets + Attack buttons, plus Continue
+  // AI: ui.js's paced stepper (runAiStep) calls aiAttackStep() once phase is 'attack'
 }
 
 function attackSeaShip(attackerIdx, seaShipId, onDone) {
@@ -492,7 +488,14 @@ function humanAttack(seaShipId) {
   });
 }
 
-function aiTakeAttackTurn(playerIdx) {
+// Performs exactly one AI attack decision: attacks once (leaving phase as
+// 'attack' so ui.js's paced stepper calls this again after a delay, for a
+// possible follow-up attack) or holds back / runs out of targets (advancing
+// to the next phase). Splitting this out of what used to be a
+// self-recursing aiTakeAttackTurn() is what lets ui.js pace out a multi-
+// attack AI turn one visible attack at a time instead of resolving them
+// all in a single instant burst.
+function aiAttackStep(playerIdx) {
   const target = aiChooseAttackTarget(playerIdx);
   if (!target) {
     log(`${state.players[playerIdx].name} holds back this turn.`);
@@ -500,8 +503,9 @@ function aiTakeAttackTurn(playerIdx) {
   }
   attackSeaShip(playerIdx, target.id, () => {
     if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
-    if (state.seaShips.length && Math.random() < 0.5) return aiTakeAttackTurn(playerIdx);
-    advancePhase();
+    if (!(state.seaShips.length && Math.random() < 0.5)) advancePhase();
+    // else: stay in 'attack' phase -- ui.js will call aiAttackStep again
+    // after a delay for a possible follow-up attack.
   });
 }
 
@@ -516,11 +520,8 @@ function finishAttackPhase() {
 function runShipsToSeaEntry() {
   const player = state.players[state.currentTurn];
   player.shipsToSeaThisTurn = 0;
-  if (!player.isHuman) {
-    aiShipsToSeaPhase(player);
-    advancePhase();
-  }
   // human: ui.js shows put-to-sea + load options
+  // AI: ui.js's paced stepper (runAiStep) calls aiShipsToSeaPhase() once phase is 'shipsToSea'
 }
 
 function putShipToSea(player, handShipUid) {
