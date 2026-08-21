@@ -34,37 +34,42 @@ const SHIPS = [
 // Captains: playable only on ships-at-sea in v1 (rules currently forbid players
 // having a captain on their own ship, "may change for captured pirate captains"
 // is still an open question — not implemented yet).
+//
+// Trimmed from 30 to 20 (Boss, 2026-08-21): the roster was almost all
+// flavorless duplicates (29 of 30 had no bonus at all), badly outnumbering
+// the 7 ship upgrades. Cut true/near-duplicates (two "William Kidd" entries;
+// three Navy captains sharing the identical "British Admiral of the Fleet"
+// flavor line; two sharing "Spanish Naval Captain") and the least broadly
+// recognizable names, while protecting every captain a ship's flavor text
+// names by name (Blackbeard/Queen Anne's Revenge, Kidd/Adventure Galley,
+// Every/Fancy, Black Bart/Royal Fortune -- cutting any of those would orphan
+// a ship's flavor line) and any captain tied to another kept captain's
+// flavor text (Ogle mentions Roberts/Bart, Barnett mentions Rackham).
+// Every remaining non-Blackbeard captain now carries a small +1 bonus by
+// type -- Navy (disciplined) +1 Def, Pirate (aggressive raiders) +1 Atk,
+// Pirate Hunter (pursuit-focused) +1 Spd -- so a captain draw is no longer
+// usually a dead card. Full removed list + reasoning in that day's notes.
 const CAPTAINS = [
-  { id: 'capt-avila',      name: 'Pedro Menéndez de Avilés', captainType: 'Navy',         cost: 150, flavor: 'Spanish, founder of St. Augustine' }, // placeholder cost
-  { id: 'capt-emo',        name: 'Angelo Emo',               captainType: 'Navy',         cost: 150, flavor: 'Venetian, worked with British' },
-  { id: 'capt-forbes',     name: 'John Forbes',              captainType: 'Navy',         cost: 150, flavor: 'British Admiral of the Fleet' },
-  { id: 'capt-howe',       name: 'Richard Howe',             captainType: 'Navy',         cost: 150, flavor: 'British Admiral of the Fleet' },
-  { id: 'capt-rowley',     name: 'William Rowley',           captainType: 'Navy',         cost: 150, flavor: 'British Admiral of the Fleet' },
-  { id: 'capt-aernoutsz',  name: 'Jurriaen Aernoutsz',       captainType: 'Navy',         cost: 150, flavor: 'Dutch Naval Captain' },
-  { id: 'capt-huidobro',   name: 'Mateo Alonso de Huidobro', captainType: 'Navy',         cost: 150, flavor: 'Spanish Naval Captain' },
-  { id: 'capt-castro',     name: 'Pedro de Castro',          captainType: 'Navy',         cost: 150, flavor: 'Spanish Naval Captain' },
+  { id: 'capt-avila',      name: 'Pedro Menéndez de Avilés', captainType: 'Navy',         bonus: { def: 1 }, cost: 150, flavor: 'Spanish, founder of St. Augustine' }, // placeholder cost
+  { id: 'capt-emo',        name: 'Angelo Emo',               captainType: 'Navy',         bonus: { def: 1 }, cost: 150, flavor: 'Venetian, worked with British' },
+  { id: 'capt-howe',       name: 'Richard Howe',             captainType: 'Navy',         bonus: { def: 1 }, cost: 150, flavor: 'British Admiral of the Fleet' },
+  { id: 'capt-aernoutsz',  name: 'Jurriaen Aernoutsz',       captainType: 'Navy',         bonus: { def: 1 }, cost: 150, flavor: 'Dutch Naval Captain' },
+  { id: 'capt-castro',     name: 'Pedro de Castro',          captainType: 'Navy',         bonus: { def: 1 }, cost: 150, flavor: 'Spanish Naval Captain' },
   { id: 'capt-blackbeard', name: 'Blackbeard',               captainType: 'Pirate', rarity: 'Rare', bonus: { atk: 3 }, cost: 400 },
-  { id: 'capt-morgan1',    name: 'Henry Morgan',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-kidd',       name: 'Captain Kidd',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-england',    name: 'Edward England',           captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-every',      name: 'Henery Every',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-rackham',    name: 'Jack Rackham',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-bonnet',     name: 'Stede Bonnet',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-bart',       name: 'Black Bart',               captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-tew',        name: 'Thomas Tew',               captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-vane',       name: 'Charles Vane',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-drake',      name: 'Sir Francis Drake',        captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-lafitte',    name: 'Jean Lafitte',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-gaspar',     name: 'Jose Gaspar',              captainType: 'Pirate',       cost: 150, flavor: "Better known as Gasparilla, one of the last great Pirates" },
-  { id: 'capt-kidd-w',     name: 'William Kidd',             captainType: 'Pirate',       cost: 150 },
-  { id: 'capt-maynard',    name: 'Lt. Robert Maynard',       captainType: 'Pirate Hunter', cost: 150 },
-  { id: 'capt-rogers',     name: 'Woodes Rogers',            captainType: 'Pirate Hunter', cost: 150 },
-  { id: 'capt-hornsby',    name: 'Richard Avery Hornsby',    captainType: 'Pirate Hunter', cost: 150 },
-  { id: 'capt-hornigold',  name: 'Benjamin Hornigold',       captainType: 'Pirate Hunter', cost: 150 },
-  { id: 'capt-porter',     name: 'Commodore David Porter',   captainType: 'Pirate Hunter', cost: 150, flavor: "Commanded the 'Mosquito Fleet,' based in Key West" },
-  { id: 'capt-barnett',    name: 'Captain Jonathan Barnett', captainType: 'Pirate Hunter', cost: 150, flavor: 'Captured Calico Jack Rackham, Anne Bonny, and Mary Read' },
-  { id: 'capt-ogle',       name: 'Captain Chaloner Ogle',    captainType: 'Pirate Hunter', cost: 150, flavor: "Ended the career of Bartholomew Roberts" },
-  { id: 'capt-perales',    name: 'Juan González Perales',    captainType: 'Pirate Hunter', cost: 150, flavor: 'Captured the pirate ship Cabellero Romano' },
+  { id: 'capt-morgan1',    name: 'Henry Morgan',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150 },
+  { id: 'capt-kidd',       name: 'Captain Kidd',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150, flavor: "Captained the Adventure Galley" },
+  { id: 'capt-every',      name: 'Henery Every',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150, flavor: 'Captained the Fancy' },
+  { id: 'capt-rackham',    name: 'Jack Rackham',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150 },
+  { id: 'capt-bonnet',     name: 'Stede Bonnet',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150 },
+  { id: 'capt-bart',       name: 'Black Bart',               captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150, flavor: "Bartholomew Roberts -- captained the Royal Fortune" },
+  { id: 'capt-vane',       name: 'Charles Vane',             captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150 },
+  { id: 'capt-gaspar',     name: 'Jose Gaspar',              captainType: 'Pirate',       bonus: { atk: 1 }, cost: 150, flavor: "Better known as Gasparilla, one of the last great Pirates" },
+  { id: 'capt-maynard',    name: 'Lt. Robert Maynard',       captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: 'Killed Blackbeard in single combat' },
+  { id: 'capt-rogers',     name: 'Woodes Rogers',            captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150 },
+  { id: 'capt-porter',     name: 'Commodore David Porter',   captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: "Commanded the 'Mosquito Fleet,' based in Key West" },
+  { id: 'capt-barnett',    name: 'Captain Jonathan Barnett', captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: 'Captured Calico Jack Rackham, Anne Bonny, and Mary Read' },
+  { id: 'capt-ogle',       name: 'Captain Chaloner Ogle',    captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: "Ended the career of Bartholomew Roberts" },
+  { id: 'capt-perales',    name: 'Juan González Perales',    captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: 'Captured the pirate ship Cabellero Romano' },
 ];
 
 // Crew: the first three are starter crews (free, drawn from outside the deck).
@@ -160,6 +165,12 @@ function shuffle(deck) {
   return d;
 }
 
+// Copies per upgrade, by rarity -- same 4:2:1 Common:Uncommon:Rare weighting
+// as the ship pile (Boss, 2026-08-21: upgrades were badly outnumbered by
+// captains, 7 types at 1 copy each vs. 30 captain types). Takes the upgrade
+// deck from 7 cards to 21 (4 Common types x4, 2 Uncommon x2, 1 Rare x1).
+const UPGRADE_COPIES_BY_RARITY = { Common: 4, Uncommon: 2, Rare: 1 };
+
 // ── Deck builder ─────────────────────────────────────────────────────────
 // Builds an identical-composition deck for a player (per Boss's "identical
 // mirrored decks" choice). Ships live in their own separate pile/pool (see
@@ -179,7 +190,7 @@ function buildDeck() {
   CREW.filter(c => !c.starter).forEach(c => addCopies(c, 'crew', 1));
   OFFICERS.forEach(c => addCopies(c, 'officer', 1));
   VIPS.forEach(c => addCopies(c, 'vip', 1));
-  UPGRADES.forEach(c => addCopies(c, 'upgrade', 1));
+  UPGRADES.forEach(c => addCopies(c, 'upgrade', UPGRADE_COPIES_BY_RARITY[c.rarity] || 1));
   TREASURE.forEach(c => addCopies(c, 'treasure', 1));
 
   return shuffle(deck);
