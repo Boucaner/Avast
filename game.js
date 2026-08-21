@@ -544,7 +544,8 @@ function loadSeaShip(player, seaShipId, handCardUid, faceUp) {
     return false;
   }
   player.hand = player.hand.filter(c => c.uid !== handCardUid);
-  log(`${player.name} loads ${findCard(handEntry.cardId).name} onto their ${findCard(seaShip.shipId).name}${faceUp ? '' : ' face-down'}.`);
+  const loadedName = faceUp ? findCard(handEntry.cardId).name : 'a card';
+  log(`${player.name} loads ${loadedName} onto their ${findCard(seaShip.shipId).name}${faceUp ? '' : ' face-down'}.`);
   return true;
 }
 

@@ -59,8 +59,11 @@ function cargoCategory(cardId) {
 
 // Builds the row of attached-card elements for any ship-like object
 // (a player's persistent ship, or a ship-at-sea). revealAll forces every
-// card face-up regardless of its faceUp flag (used for the player's own
-// persistent ship, and for your own ships-at-sea).
+// card face-up regardless of its faceUp flag -- used only for the player's
+// own persistent ship (always fully visible per Setup). Ships at sea never
+// get this: a face-down card there is hidden from everyone, including
+// whoever placed it, until something reveals it (see loadSeaShip's use of
+// faceUp, and flipShipFaceUp at combat).
 function buildShipSlotsEl(ship, revealAll) {
   const slots = document.createElement('div');
   slots.className = 'ship-slots';
@@ -148,7 +151,10 @@ function renderOcean() {
       <span class="sea-ship-rating">${shipRating(seaShip, 'atk')}/${shipRating(seaShip, 'def')}/${shipRating(seaShip, 'spd')}</span>
     `;
     card.appendChild(header);
-    card.appendChild(buildShipSlotsEl(seaShip, isOwnShip));
+    // No reveal-because-you-own-it exception: a face-down card at sea is
+    // hidden from everyone, including whoever placed it, until something
+    // (a card/equipment effect, or combat via flipShipFaceUp) reveals it.
+    card.appendChild(buildShipSlotsEl(seaShip, false));
 
     const actions = document.createElement('div');
     actions.className = 'sea-ship-actions';
