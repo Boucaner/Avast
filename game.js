@@ -71,13 +71,18 @@ function shipAttachments(ship) {
   return list;
 }
 
-// Combat rating = base ship stat + all attached cards' bonus for that stat.
-// Per the rules, face-down cards still count once combat starts (they flip
-// face-up at that moment) — faceUp only affects what's rendered beforehand.
+// Combat rating = base ship stat + attached cards' bonus for that stat, but
+// only counting cards that are currently face-up. A face-down card
+// contributes nothing to a ship's effective stats -- not just visually
+// hidden, genuinely inert -- until something reveals it (a card/equipment
+// effect, or combat: attackSeaShip/runDefendingPhase call flipShipFaceUp
+// before computing the actual combat totals, so a face-down attachment
+// counts from the moment combat starts, exactly as the rules require).
 function shipRating(ship, statKey) {
   const base = findCard(ship.shipId);
   let total = base[statKey] || 0;
   shipAttachments(ship).forEach(entry => {
+    if (!entry.faceUp) return;
     const card = findCard(entry.cardId);
     if (card && card.bonus && card.bonus[statKey]) total += card.bonus[statKey];
   });
