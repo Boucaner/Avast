@@ -185,15 +185,23 @@ function buildDeck() {
   return shuffle(deck);
 }
 
-// A player's personal ship pile/pool — every ship type, doubled. Ships that
-// leave play (sold, sunk, or lost in combat) shuffle back into this same
-// pile rather than going to the regular discard pile (see returnShipToPile
-// in game.js) — it's a self-circulating pool, not a draw-then-discard deck.
+// Copies per ship, by rarity -- weighted so small/common ships actually
+// outnumber the big rare ones in circulation (Boss, 2026-08-21: previously
+// every ship type got a flat 2 copies regardless of rarity, so Uncommon/Rare
+// hulls made up 61% of the pool -- inverted from what you'd expect of a real
+// shipping lane, and part of why starter-mode combat skewed so unfavorable).
+const SHIP_COPIES_BY_RARITY = { Common: 4, Uncommon: 2, Rare: 1 };
+
+// A player's personal ship pile/pool. Ships that leave play (sold, sunk, or
+// lost in combat) shuffle back into this same pile rather than going to the
+// regular discard pile (see returnShipToPile in game.js) — it's a
+// self-circulating pool, not a draw-then-discard deck.
 function buildShipPile() {
   const pile = [];
   let seq = 0;
   SHIPS.forEach(s => {
-    for (let i = 0; i < 2; i++) {
+    const copies = SHIP_COPIES_BY_RARITY[s.rarity] || 2;
+    for (let i = 0; i < copies; i++) {
       pile.push({ uid: `s${seq++}`, cardId: s.id, category: 'ship', faceUp: false });
     }
   });
