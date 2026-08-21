@@ -180,13 +180,13 @@ html, body {
 .card-name { font-weight: 700; line-height: 1.15; }
 .card-stat { color: var(--green); font-weight: 600; }
 
-.cardtype-ship     { border-top: 4px solid #2563eb; }
-.cardtype-captain  { border-top: 4px solid #7c3aed; }
-.cardtype-crew     { border-top: 4px solid #059669; }
-.cardtype-officer  { border-top: 4px solid #0891b2; }
-.cardtype-upgrade  { border-top: 4px solid #ea580c; }
-.cardtype-treasure { border-top: 4px solid var(--gold); }
-.cardtype-vip      { border-top: 4px solid var(--red); }
+.cardtype-ship     { border-top: 6px solid #2563eb; }
+.cardtype-captain  { border-top: 6px solid #7c3aed; }
+.cardtype-crew     { border-top: 6px solid #059669; }
+.cardtype-officer  { border-top: 6px solid #0891b2; }
+.cardtype-upgrade  { border-top: 6px solid #ea580c; }
+.cardtype-treasure { border-top: 6px solid var(--gold); }
+.cardtype-vip      { border-top: 6px solid var(--red); }
 
 .card.face-down {
   background: repeating-linear-gradient(135deg, #1a237e 0px, #1a237e 8px, #283593 8px, #283593 16px);
