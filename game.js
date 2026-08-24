@@ -352,9 +352,8 @@ function runDefendingPhase() {
   if (!pirateShips.length) return advancePhase();
 
   const threat = pirateShips[Math.floor(Math.random() * pirateShips.length)];
-  const ownerName = state.players[threat.ownerIdx].name;
   const roll = rollDie();
-  log(`${possessive(ownerName)} ${findCard(threat.shipId).name} at sea flies pirate colors — ${player.name} rolls ${roll} to see if it attacks (1-3 = attacked).`);
+  log(`The ${findCard(threat.shipId).name} at sea flies pirate colors — ${player.name} rolls ${roll} to see if it attacks (1-3 = attacked).`);
   if (roll > 3) {
     log(`No attack this time — smooth sailing for ${player.name}.`);
     return advancePhase();
@@ -379,7 +378,7 @@ function runDefendingPhase() {
     const atkRoll = rollDie(), defRoll = rollDie();
     const atkTotal = shipRating(threat, 'atk') + atkRoll;
     const defTotal = shipRating(defenderShip, 'def') - defPenalty + defRoll;
-    log(`Combat: ${possessive(ownerName)} ${findCard(threat.shipId).name} attack ${shipRating(threat, 'atk')} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(player.name)} defense ${shipRating(defenderShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
+    log(`Combat: The ${findCard(threat.shipId).name} attack ${shipRating(threat, 'atk')} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(player.name)} defense ${shipRating(defenderShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
     if (defTotal >= atkTotal) {
       log(`${player.name} beats back the attack and captures the pirate ship!`);
@@ -432,21 +431,21 @@ function runAttackPhaseEntry() {
 // a counter-attack too if it comes to that, since a genuinely terrified crew
 // fights worse both times, not just the first swing. Deliberately simple for
 // now (Boss wants to see how it plays before adding more to it).
-function rollIntimidation(attackerName, ownerName) {
+function rollIntimidation(attackerName) {
   const roll = rollDie();
   const result = { roll, atkBonus: 0, defAtkPenalty: 0, defDefPenalty: 0, defSpdPenalty: 0 };
   if (roll <= 4) {
     result.atkBonus = 1;
-    log(`${attackerName} strikes fear into ${possessive(ownerName)} crew (rolled ${roll}) — +1 to attack.`);
+    log(`${attackerName} strikes fear into their crew (rolled ${roll}) — +1 to attack.`);
   } else if (roll === 5) {
     result.atkBonus = 1;
     result.defSpdPenalty = 1;
-    log(`${attackerName} strikes fear into ${possessive(ownerName)} crew (rolled ${roll}) — +1 to attack, -1 to their speed.`);
+    log(`${attackerName} strikes fear into their crew (rolled ${roll}) — +1 to attack, -1 to their speed.`);
   } else {
     result.defAtkPenalty = 1;
     result.defDefPenalty = 1;
     result.defSpdPenalty = 1;
-    log(`Sheer terror grips ${possessive(ownerName)} crew (${attackerName} rolled ${roll}) — -1 to all their stats this fight.`);
+    log(`Sheer terror grips their crew (${attackerName} rolled ${roll}) — -1 to all their stats this fight.`);
   }
   return result;
 }
@@ -457,13 +456,12 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
   if (!seaShip) return onDone && onDone();
   const attackerShip = attacker.ship;
   const ownerIdx = seaShip.ownerIdx;
-  const ownerName = state.players[ownerIdx].name;
 
-  const fear = rollIntimidation(attacker.name, ownerName);
+  const fear = rollIntimidation(attacker.name);
 
   const proceed = (fled) => {
     if (fled) {
-      log(`${possessive(ownerName)} ${findCard(seaShip.shipId).name} slips away into the fog. Combat avoided.`);
+      log(`The ${findCard(seaShip.shipId).name} slips away into the fog. Combat avoided.`);
       return onDone && onDone();
     }
     flipShipFaceUp(attackerShip);
@@ -474,13 +472,13 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
     const atkRoll = rollDie(), defRoll = rollDie();
     const atkTotal = shipRating(attackerShip, 'atk') + fear.atkBonus + atkRoll;
     const defTotal = shipRating(seaShip, 'def') - defPenalty + defRoll;
-    log(`Combat: ${possessive(attacker.name)} attack ${shipRating(attackerShip, 'atk') + fear.atkBonus} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(ownerName)} ${findCard(seaShip.shipId).name} defense ${shipRating(seaShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
+    log(`Combat: ${possessive(attacker.name)} attack ${shipRating(attackerShip, 'atk') + fear.atkBonus} (attack) + ${atkRoll} (roll) = ${atkTotal} vs the ${findCard(seaShip.shipId).name} defense ${shipRating(seaShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
     if (defTotal >= atkTotal) {
-      log(`${possessive(ownerName)} ${findCard(seaShip.shipId).name} holds them off!`);
+      log(`The ${findCard(seaShip.shipId).name} holds them off!`);
       return resolveCounterAttack(attacker, seaShip, onDone, fear.defAtkPenalty);
     }
-    log(`${attacker.name} wins the exchange and captures ${possessive(ownerName)} ${findCard(seaShip.shipId).name}!`);
+    log(`${attacker.name} wins the exchange and captures the ${findCard(seaShip.shipId).name}!`);
     state.seaShips = state.seaShips.filter(s => s.id !== seaShipId);
     sinkOrCapture(attacker, seaShip);
     onDone && onDone();
@@ -492,7 +490,7 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
     requestFleeDecision(ownerIdx, seaShip, attackerShip, (attemptFlee) => {
       if (!attemptFlee) return proceed(false);
       const fr = rollDie();
-      log(`${ownerName} attempts to flee their ship at sea — rolls ${fr} (need 1-5).`);
+      log(`The ship at sea attempts to flee — rolls ${fr} (need 1-5).`);
       if (fr <= 5) return proceed(true);
       log('Flee attempt fails! -1 Defense this combat.');
       seaShip._fledAttemptFailed = true;
@@ -513,14 +511,13 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
 // attacker's Attack phase ends immediately, win or not, even if they had
 // more attacks available this turn.
 function resolveCounterAttack(attacker, seaShip, onDone, fearAtkPenalty) {
-  const ownerName = state.players[seaShip.ownerIdx].name;
   const attackerShip = attacker.ship;
   const atkPenalty = fearAtkPenalty || 0;
 
   const atkRoll = rollDie(), defRoll = rollDie();
   const atkTotal = shipRating(seaShip, 'atk') - atkPenalty + atkRoll;
   const defTotal = shipRating(attackerShip, 'def') + defRoll;
-  log(`Counter-attack: ${possessive(ownerName)} ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk') - atkPenalty} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')} (defense) + ${defRoll} (roll) = ${defTotal}.`);
+  log(`Counter-attack: The ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk') - atkPenalty} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
   if (atkTotal > defTotal) {
     log(`${possessive(attacker.name)} ship is overwhelmed!`);
