@@ -478,6 +478,25 @@ function openHomePortModal() {
     shipChoices.innerHTML = '<p class="phase-note">No alternative ships available — keep your current ship.</p>';
   }
 
+  // The capture pile only ever showed upgrade/ship entries as individual
+  // cards (the ones with their own equip/sail choices above) -- everything
+  // else (crew turned down at capture, treasure, VIPs, officers, etc.) was
+  // silently summed into the sell total above with no way to actually see
+  // what's in there. Boss (2026-08-24): show it, same read-only pattern as
+  // the discard pile below.
+  const captureLeftovers = human.capturePile.filter(e => e.category !== 'upgrade' && e.category !== 'ship');
+  $('homeport-capture-label').textContent = `Also in your capture pile — will be sold unless used above (${captureLeftovers.length} card${captureLeftovers.length === 1 ? '' : 's'}):`;
+  const captureEl = $('homeport-capture-pile');
+  captureEl.innerHTML = '';
+  if (captureLeftovers.length) {
+    captureLeftovers.forEach(entry => {
+      const card = findCard(entry.cardId);
+      if (card) captureEl.appendChild(makeCardEl(card, entry.category));
+    });
+  } else {
+    captureEl.innerHTML = '<p class="phase-note">Nothing else.</p>';
+  }
+
   // Discard pile is otherwise invisible during play (no interaction with it
   // yet -- may add the ability to open/use it later) -- Home Port is where
   // it becomes visible, read-only, per Boss (2026-08-21).
