@@ -10,9 +10,14 @@
 // player ships directly, matching the rules' own "players do not fight
 // against each other" line.
 //
-// Turn phases implemented (5 of the ruleset's 8 — see build plan for the rest):
-//   Upgrade -> Defending (pirate-type ships-at-sea only) -> Attack/Combat -> Ships-to-Sea -> Draw
+// Turn phases implemented (4 of the ruleset's 7 — see build plan for the rest):
+//   Defending (pirate-type ships-at-sea only) -> Attack/Combat -> Ships-to-Sea -> Draw
 // Flags, wars, Letter of Marque, Events, and the Treasure Map action are deferred.
+//
+// There is no Upgrade Phase (removed 2026-08-24, Boss's design). Upgrades for
+// a player's own ship are capture-only and equip for free at Home Port only
+// (unless a card says otherwise) -- see doHomePort(). Ships-at-sea still load
+// upgrades from hand during Ships-to-Sea, unaffected by this.
 
 const WIN_GOLD = 3000;        // placeholder win target — retune once Boss locks a real number
 const MAX_HAND = 7;
@@ -33,7 +38,7 @@ const state = {
   players: [],       // { name, isHuman, hand, drawPile, discardPile, capturePile, stash, ship }
   seaShips: [],       // shared ocean: { id, ownerIdx, shipId, captain, crew, officer, upgrades, cargo }
   currentTurn: 0,
-  phase: 'start',     // 'start' | 'turnStart' | 'upgrade' | 'defending' | 'attack' | 'shipsToSea' | 'draw' | 'homeport' | 'gameover'
+  phase: 'start',     // 'start' | 'turnStart' | 'defending' | 'attack' | 'shipsToSea' | 'draw' | 'homeport' | 'gameover'
   pendingFlee: null,  // { controllerIdx, callback } when a human flee decision is needed
   log: [],
   winner: null,
@@ -94,6 +99,10 @@ function shipRating(ship, statKey) {
 }
 
 function statTotal(card) { return (card.atk || 0) + (card.def || 0) + (card.spd || 0); }
+
+// Most cards price their gold value in `value`; upgrades use `sellValue`
+// instead (they have no buy cost anymore -- capture-only, free to equip).
+function cardSellValue(card) { return card.value != null ? card.value : (card.sellValue != null ? card.sellValue : 0); }
 
 function shipIsPirateType(ship) {
   const base = findCard(ship.shipId);
@@ -240,15 +249,17 @@ function startTurn() {
 }
 
 function beginRegularTurn() {
-  state.phase = 'upgrade';
-  // AI's upgrade action itself is applied by ui.js's paced stepper.
+  state.phase = 'attack';
+  runAttackPhaseEntry();
+  // No Upgrade Phase (removed 2026-08-24) -- a regular turn starts straight
+  // at Attack. Upgrading the player's own ship only happens at Home Port now.
 }
 
 function advancePhase() {
   // Defending temporarily skipped (Boss, 2026-08-18) — to be worked back in
   // later. runDefendingPhase() and everything it depends on is untouched;
   // re-add 'defending' here to restore it.
-  const order = ['upgrade', 'attack', 'shipsToSea', 'draw'];
+  const order = ['attack', 'shipsToSea', 'draw'];
   const i = order.indexOf(state.phase);
   const next = order[i + 1];
   state.phase = next;
@@ -257,26 +268,6 @@ function advancePhase() {
   if (next === 'attack') return runAttackPhaseEntry();
   if (next === 'shipsToSea') return runShipsToSeaEntry();
   if (next === 'draw') return runDrawPhase();
-}
-
-// ── Upgrade phase (installs onto the player's own persistent ship) ───────
-
-function buyUpgrade(player, cardUid) {
-  const handEntry = player.hand.find(c => c.uid === cardUid);
-  if (!handEntry || handEntry.category !== 'upgrade') return false;
-  const card = findCard(handEntry.cardId);
-  if (player.stash < card.buyCost) return false;
-  player.stash -= card.buyCost;
-  const old = player.ship.upgrades[card.slot];
-  if (old) player.discardPile.push({ uid: old.cardId + '-disc' + Math.random(), cardId: old.cardId, category: 'upgrade' });
-  player.ship.upgrades[card.slot] = { cardId: card.id, faceUp: true };
-  player.hand = player.hand.filter(c => c.uid !== cardUid);
-  log(`${player.name} installs ${card.name} (${card.slot}).`);
-  return true;
-}
-
-function finishUpgradePhase() {
-  advancePhase();
 }
 
 // ── Shared combat resolution helpers ────────────────────────────────────
@@ -666,8 +657,13 @@ function endTurn() {
 // ── Home Port ────────────────────────────────────────────────────────────
 // shipChoice: { source: 'hand'|'capture', uid } to switch ships, or falsy to
 // keep the current one.
+// upgradeUidsToEquip: capture-pile uids of upgrade cards to equip onto
+// whichever ship the player ends up with, for free -- the only way an
+// upgrade reaches the player's own ship (see the "Upgrade Phase removed"
+// rule in Avast Rules). Anything captured but not listed here just gets
+// sold along with the rest of the capture pile, same as always.
 
-function doHomePort(player, shipChoice) {
+function doHomePort(player, shipChoice, upgradeUidsToEquip) {
   state.phase = 'homeport';
   log(`${player.name} sails for Home Port.`);
 
@@ -675,14 +671,17 @@ function doHomePort(player, shipChoice) {
   if (shipChoice && shipChoice.source === 'capture') {
     chosenCaptureEntry = player.capturePile.find(e => e.uid === shipChoice.uid && e.category === 'ship');
   }
+  const equipUids = upgradeUidsToEquip || [];
+  const toEquip = player.capturePile.filter(e => e.category === 'upgrade' && equipUids.includes(e.uid));
 
-  // 1) Sell capture pile (excluding a ship being kept to sail with) -- any
-  // ship cards among the sold cards return to the ship pile, not discardPile
+  // 1) Sell capture pile (excluding a ship being kept to sail with, and any
+  // upgrades chosen to equip instead) -- any ship cards among the sold cards
+  // return to the ship pile, not discardPile
   let earned = 0;
-  const toSell = player.capturePile.filter(e => e !== chosenCaptureEntry);
+  const toSell = player.capturePile.filter(e => e !== chosenCaptureEntry && !toEquip.includes(e));
   toSell.forEach(entry => {
     const card = findCard(entry.cardId);
-    if (card) earned += card.value != null ? card.value : (card.sellValue != null ? card.sellValue : 0);
+    if (card) earned += cardSellValue(card);
   });
   if (earned > 0) log(`${player.name} sells their haul for ${earned} gold.`);
   player.stash += earned;
@@ -747,6 +746,17 @@ function doHomePort(player, shipChoice) {
     outgoingShip.officer = null;
   }
 
+  // 4) Equip any chosen capture-pile upgrades onto the (possibly new) ship,
+  // free of charge -- the only place this can happen (see Home Port rules).
+  toEquip.forEach(entry => {
+    const card = findCard(entry.cardId);
+    if (!card) return;
+    const old = player.ship.upgrades[card.slot];
+    if (old) player.discardPile.push({ uid: old.cardId + '-disc' + Math.random(), cardId: old.cardId, category: 'upgrade' });
+    player.ship.upgrades[card.slot] = { cardId: card.id, faceUp: true };
+    log(`${player.name} equips the captured ${card.name} (${card.slot}) — free at Home Port.`);
+  });
+
   drawToHand(player, MAX_HAND);
   if (checkWin()) return;
   state.currentTurn = opponentIndex(state.currentTurn);
@@ -775,7 +785,7 @@ function estimateWinProb(attackerShip, defenderShip) {
 }
 
 function aiWantsHomePort(player) {
-  const captureValue = player.capturePile.reduce((sum, e) => { const c = findCard(e.cardId); return sum + (c && c.value ? c.value : 0); }, 0);
+  const captureValue = player.capturePile.reduce((sum, e) => { const c = findCard(e.cardId); return sum + (c ? cardSellValue(c) : 0); }, 0);
   const chance = clamp(captureValue / HOME_PORT_TRIGGER_RATIO, 0, 0.85);
   return Math.random() < chance;
 }
@@ -794,16 +804,19 @@ function aiChooseHomePortShip(player) {
   return best;
 }
 
-function aiUpgradePhase(player) {
-  const upgradeCards = player.hand.filter(c => c.category === 'upgrade');
-  upgradeCards.forEach(handEntry => {
-    const card = findCard(handEntry.cardId);
-    if (player.stash < card.buyCost) return;
-    const slotCard = player.ship.upgrades[card.slot];
-    const currentCard = slotCard ? findCard(slotCard.cardId) : null;
-    const better = !currentCard || totalBonus(card.bonus) > totalBonus(currentCard.bonus);
-    if (better && Math.random() < 0.8) buyUpgrade(player, handEntry.uid);
+// Picks which capture-pile upgrades the AI equips at Home Port -- free, so
+// there's no affordability question, just "best available per slot" (only
+// one upgrade can occupy a slot; anything not chosen here still gets sold
+// along with the rest of the capture pile).
+function aiChooseHomePortUpgrades(player) {
+  const bySlot = {};
+  player.capturePile.filter(e => e.category === 'upgrade').forEach(entry => {
+    const card = findCard(entry.cardId);
+    if (!card) return;
+    const cur = bySlot[card.slot];
+    if (!cur || totalBonus(card.bonus) > totalBonus(findCard(cur.cardId).bonus)) bySlot[card.slot] = entry;
   });
+  return Object.values(bySlot).map(e => e.uid);
 }
 
 function totalBonus(bonus) {

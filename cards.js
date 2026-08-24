@@ -116,15 +116,18 @@ const VIPS = [
 ];
 
 // Upgrades: one slot per area (cannon / sails / hull) — a new upgrade in an
-// area immediately replaces (discards) the old one.
+// area immediately replaces (discards) the old one. Capture-only (no buy
+// cost) — a player's own ship can only get one via the capture pile, equipped
+// free at Home Port; sellValue is what it's worth if sold instead. Ships-at-
+// sea still load these straight from hand, same as always.
 const UPGRADES = [
-  { id: 'up-cannon-small', name: 'Cannon, Small', slot: 'cannon', rarity: 'Common',   buyCost: 200, sellValue: 50,  bonus: { atk: 1 } },
-  { id: 'up-cannon-large', name: 'Cannon, Large', slot: 'cannon', rarity: 'Uncommon', buyCost: 500, sellValue: 200, bonus: { atk: 2 } },
-  { id: 'up-cannon-huge',  name: 'Cannon, Huge',  slot: 'cannon', rarity: 'Rare',     buyCost: 800, sellValue: 300, bonus: { atk: 3, spd: -1 } }, // placeholder cost
-  { id: 'up-sails-fast',   name: 'Sails, Fast',   slot: 'sails',  rarity: 'Common',   buyCost: 150, sellValue: 50,  bonus: { spd: 1 } }, // placeholder cost
-  { id: 'up-sails-tough',  name: 'Sails, Tough',  slot: 'sails',  rarity: 'Uncommon', buyCost: 300, sellValue: 100, bonus: { def: 1 } }, // placeholder cost
-  { id: 'up-hull-fast',    name: 'Hull, Fast',    slot: 'hull',   rarity: 'Common',   buyCost: 150, sellValue: 50,  bonus: { spd: 1 } }, // placeholder cost
-  { id: 'up-hull-strong',  name: 'Hull, Strong',  slot: 'hull',   rarity: 'Common',   buyCost: 150, sellValue: 50,  bonus: { def: 1 } }, // placeholder cost
+  { id: 'up-cannon-small', name: 'Cannon, Small', slot: 'cannon', rarity: 'Common',   sellValue: 50,  bonus: { atk: 1 } },
+  { id: 'up-cannon-large', name: 'Cannon, Large', slot: 'cannon', rarity: 'Uncommon', sellValue: 200, bonus: { atk: 2 } },
+  { id: 'up-cannon-huge',  name: 'Cannon, Huge',  slot: 'cannon', rarity: 'Rare',     sellValue: 300, bonus: { atk: 3, spd: -1 } }, // placeholder value
+  { id: 'up-sails-fast',   name: 'Sails, Fast',   slot: 'sails',  rarity: 'Common',   sellValue: 50,  bonus: { spd: 1 } }, // placeholder value
+  { id: 'up-sails-tough',  name: 'Sails, Tough',  slot: 'sails',  rarity: 'Uncommon', sellValue: 100, bonus: { def: 1 } }, // placeholder value
+  { id: 'up-hull-fast',    name: 'Hull, Fast',    slot: 'hull',   rarity: 'Common',   sellValue: 50,  bonus: { spd: 1 } }, // placeholder value
+  { id: 'up-hull-strong',  name: 'Hull, Strong',  slot: 'hull',   rarity: 'Common',   sellValue: 50,  bonus: { def: 1 } }, // placeholder value
 ];
 
 // Treasure / cargo — sold at Home Port for gold; some carry combat bonuses.

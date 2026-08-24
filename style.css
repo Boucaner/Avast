@@ -202,6 +202,7 @@ html, body {
 .hand-card-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .hand-card-wrap.load-eligible .card { cursor: pointer; box-shadow: 0 0 0 2px var(--gold), var(--shadow); }
 .hand-card-wrap.load-eligible.selected .card { box-shadow: 0 0 0 2px var(--green-light), var(--shadow); }
+.hand-card-wrap.equip-selected .card { box-shadow: 0 0 0 2px var(--green-light), var(--shadow); }
 .mini-btn-row { display: flex; gap: 4px; }
 .mini-btn {
   background: #1a1a1a; color: var(--gold); border: 1px solid var(--gold);
@@ -250,6 +251,7 @@ html, body {
   padding: 16px;
 }
 .modal.hidden { display: none; }
+.hidden { display: none; }
 .modal-box {
   background: #161616;
   border: 1px solid #333;

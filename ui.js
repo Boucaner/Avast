@@ -96,7 +96,7 @@ function renderPlayerShipZone(zoneEl, player) {
   zoneEl.appendChild(header);
   zoneEl.appendChild(buildShipSlotsEl(player.ship, true));
 
-  const captureValue = player.capturePile.reduce((s, e) => { const c = findCard(e.cardId); return s + (c && c.value ? c.value : 0); }, 0);
+  const captureValue = player.capturePile.reduce((s, e) => { const c = findCard(e.cardId); return s + (c ? cardSellValue(c) : 0); }, 0);
   const stats = document.createElement('div');
   stats.className = 'ship-econ';
   stats.innerHTML = `
@@ -178,7 +178,6 @@ function renderOcean() {
 
 const PHASE_LABELS = {
   turnStart: 'Choosing: Set Sail or Home Port',
-  upgrade: 'Upgrade Phase',
   defending: 'Defending Phase',
   attack: 'Attack Phase',
   shipsToSea: 'Ships-to-Sea Phase',
@@ -241,14 +240,7 @@ function renderHandAndActions() {
     wrap.appendChild(cardEl);
 
     if (isHumanTurn && !state.pendingFlee) {
-      if (state.phase === 'upgrade' && entry.category === 'upgrade') {
-        const btn = document.createElement('button');
-        btn.className = 'mini-btn';
-        btn.textContent = `Install (${card.buyCost}g)`;
-        btn.disabled = human.stash < card.buyCost;
-        btn.onclick = () => { buyUpgrade(human, entry.uid); render(); };
-        wrap.appendChild(btn);
-      } else if (state.phase === 'shipsToSea' && entry.category === 'ship') {
+      if (state.phase === 'shipsToSea' && entry.category === 'ship') {
         const oceanFull = state.seaShips.length >= SHIPS_AT_SEA_CAP;
         const btn = document.createElement('button');
         btn.className = 'mini-btn';
@@ -291,9 +283,6 @@ function renderHandAndActions() {
   if (state.phase === 'turnStart') {
     addAction(actionsEl, 'Set Sail', () => { beginRegularTurn(); render(); });
     addAction(actionsEl, 'Return to Home Port', () => { openHomePortModal(); });
-  } else if (state.phase === 'upgrade') {
-    actionsEl.appendChild(phaseNote('Upgrade Phase — install cannons/sails/hull from hand, or continue.'));
-    addAction(actionsEl, 'Continue', () => { finishUpgradePhase(); render(); });
   } else if (state.phase === 'defending') {
     actionsEl.appendChild(phaseNote('Defending Phase — resolving automatically…'));
   } else if (state.phase === 'attack') {
@@ -343,18 +332,68 @@ function addAction(container, label, handler) {
 
 // ── Home Port modal ─────────────────────────────────────────────────────
 
+// Capture-pile upgrade uids the player has chosen to equip free at Home
+// Port instead of selling -- UI-only selection state, reset whenever the
+// modal is freshly opened (not on an internal re-render from a toggle).
+let uiHomePortEquipUids = new Set();
+
 function openHomePortModal() {
   const human = state.players.find(p => p.isHuman);
-  const captureValue = human.capturePile.reduce((s, e) => { const c = findCard(e.cardId); return s + (c && c.value ? c.value : 0); }, 0);
+  if ($('modal-homeport').classList.contains('hidden')) uiHomePortEquipUids = new Set();
+
+  const captureUpgrades = human.capturePile.filter(e => e.category === 'upgrade');
+  const soldCount = human.capturePile.length - uiHomePortEquipUids.size;
+  const captureValue = human.capturePile.reduce((s, e) => {
+    if (uiHomePortEquipUids.has(e.uid)) return s; // equipping instead of selling
+    const c = findCard(e.cardId);
+    return s + (c ? cardSellValue(c) : 0);
+  }, 0);
   const ship = human.ship;
   let upkeep = 0;
   if (ship.crew) upkeep += findCard(ship.crew.cardId).value || 0;
   if (ship.officer) upkeep += findCard(ship.officer.cardId).cost || 0;
 
   $('homeport-summary').innerHTML = `
-    <p>Selling your capture pile (${human.capturePile.length} cards): <strong>+${captureValue}g</strong></p>
+    <p>Selling your capture pile (${soldCount} card${soldCount === 1 ? '' : 's'}): <strong>+${captureValue}g</strong></p>
     <p>Crew/officer upkeep: <strong>-${upkeep}g</strong>${upkeep > human.stash + captureValue ? ' — you can\'t cover this! You\'ll lose your ship and upgrades, reverting to your starter.' : ''}</p>
   `;
+
+  // Captured upgrades: equip free (the only place this can happen), or leave
+  // them to be sold with the rest of the capture pile above.
+  const upgradeLabel = $('homeport-upgrade-label');
+  const upgradeEl = $('homeport-upgrade-choices');
+  upgradeEl.innerHTML = '';
+  if (captureUpgrades.length) {
+    upgradeLabel.textContent = 'Equip a captured upgrade (free), or leave it to be sold:';
+    upgradeLabel.classList.remove('hidden');
+    captureUpgrades.forEach(entry => {
+      const card = findCard(entry.cardId);
+      const equipped = uiHomePortEquipUids.has(entry.uid);
+      const wrap = document.createElement('div');
+      wrap.className = 'hand-card-wrap' + (equipped ? ' equip-selected' : '');
+      wrap.appendChild(makeCardEl(card, 'upgrade'));
+      const btn = document.createElement('button');
+      btn.className = 'mini-btn';
+      btn.textContent = equipped ? 'Equipped ✓ (click to sell instead)' : `Equip Free (${card.slot})`;
+      btn.onclick = () => {
+        if (equipped) {
+          uiHomePortEquipUids.delete(entry.uid);
+        } else {
+          // Only one upgrade can occupy a slot -- picking a new one for the
+          // same slot replaces any earlier pick instead of stacking them.
+          human.capturePile
+            .filter(e => e.category === 'upgrade' && e.uid !== entry.uid && findCard(e.cardId).slot === card.slot)
+            .forEach(e => uiHomePortEquipUids.delete(e.uid));
+          uiHomePortEquipUids.add(entry.uid);
+        }
+        openHomePortModal();
+      };
+      wrap.appendChild(btn);
+      upgradeEl.appendChild(wrap);
+    });
+  } else {
+    upgradeLabel.classList.add('hidden');
+  }
 
   const shipChoices = $('homeport-ship-choices');
   shipChoices.innerHTML = '';
@@ -376,7 +415,7 @@ function openHomePortModal() {
     const card = findCard(entry.cardId);
     addChoice(card, `Buy & Sail (${card.value}g)`, () => {
       $('modal-homeport').classList.add('hidden');
-      doHomePort(human, { source: 'hand', uid: entry.uid });
+      doHomePort(human, { source: 'hand', uid: entry.uid }, Array.from(uiHomePortEquipUids));
       render();
       scheduleAiIfNeeded();
     });
@@ -387,7 +426,7 @@ function openHomePortModal() {
     const card = findCard(entry.cardId);
     addChoice(card, 'Sail with this (free)', () => {
       $('modal-homeport').classList.add('hidden');
-      doHomePort(human, { source: 'capture', uid: entry.uid });
+      doHomePort(human, { source: 'capture', uid: entry.uid }, Array.from(uiHomePortEquipUids));
       render();
       scheduleAiIfNeeded();
     });
@@ -484,13 +523,10 @@ function runAiStep() {
 
   if (state.phase === 'turnStart') {
     if (aiWantsHomePort(cur)) {
-      doHomePort(cur, aiChooseHomePortShip(cur));
+      doHomePort(cur, aiChooseHomePortShip(cur), aiChooseHomePortUpgrades(cur));
     } else {
       beginRegularTurn();
     }
-  } else if (state.phase === 'upgrade') {
-    aiUpgradePhase(cur);
-    advancePhase();
   } else if (state.phase === 'attack') {
     aiAttackStep(state.currentTurn);
   } else if (state.phase === 'shipsToSea') {
@@ -541,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-homeport-confirm').onclick = () => {
     const human = state.players.find(p => p.isHuman);
     $('modal-homeport').classList.add('hidden');
-    doHomePort(human);
+    doHomePort(human, null, Array.from(uiHomePortEquipUids));
     render();
     scheduleAiIfNeeded();
   };
