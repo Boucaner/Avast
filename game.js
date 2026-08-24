@@ -143,11 +143,12 @@ function initGame() {
     makePlayer('Blackheart Bill', false),
   ];
   state.seaShips = [];
-  state.currentTurn = 0;
+  state.currentTurn = Math.floor(Math.random() * state.players.length);
   state.phase = 'turnStart';
   state.winner = null;
   state.log = [];
   log('New voyage begins. Fair winds!');
+  log(`${state.players[state.currentTurn].name} wins the coin toss and sails first.`);
 }
 
 function makePlayer(name, isHuman) {
@@ -461,6 +462,16 @@ function runDefendingPhase() {
 
 function runAttackPhaseEntry() {
   if (state.turnEndedByLoss) { state.turnEndedByLoss = false; state.phase = 'shipsToSea'; return runShipsToSeaEntry(); }
+  const player = state.players[state.currentTurn];
+  if (player.isFirstTurn) {
+    // No attacking on your very first turn (Boss, 2026-08-24). Also
+    // consumed by runDefendingPhase() -- if Defending ever gets re-added
+    // ahead of Attack in the turn order, whichever phase runs first clears
+    // it for the rest of that turn.
+    player.isFirstTurn = false;
+    log(`${player.name} holds off attacking on their first turn.`);
+    return advancePhase();
+  }
   if (!state.seaShips.length) {
     return advancePhase();
   }
