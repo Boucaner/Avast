@@ -21,6 +21,7 @@
 
 const WIN_GOLD = 3000;        // placeholder win target — retune once Boss locks a real number
 const MAX_HAND = 7;
+const MAX_HAND_SHIPS = 3;     // cap on ship cards sitting in hand at once (Boss, 2026-08-24)
 const HOME_PORT_TRIGGER_RATIO = 800; // AI: capture-pile value at which Home Port starts looking attractive
 const SHIPS_TO_SEA_CAP = 3;   // placeholder — rules leave this undecided ("maybe 3")
 const SHIPS_AT_SEA_CAP = 12;  // placeholder — total ships-at-sea, all owners combined, before the ocean is "full"
@@ -193,6 +194,7 @@ function drawToHand(player, target) {
 // like every other card type.
 function drawOneShip(player, silent) {
   if (!player.shipDrawPile.length) return false;
+  if (player.hand.filter(c => c.category === 'ship').length >= MAX_HAND_SHIPS) return false;
   const card = player.shipDrawPile.pop();
   player.hand.push(card);
   player.shipsDrawnThisTurn = (player.shipsDrawnThisTurn || 0) + 1;
@@ -377,7 +379,7 @@ function runDefendingPhase() {
     const atkRoll = rollDie(), defRoll = rollDie();
     const atkTotal = shipRating(threat, 'atk') + atkRoll;
     const defTotal = shipRating(defenderShip, 'def') - defPenalty + defRoll;
-    log(`Combat: ${possessive(ownerName)} ${findCard(threat.shipId).name} attack ${shipRating(threat, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(player.name)} defense ${shipRating(defenderShip, 'def') - defPenalty}+${defRoll}=${defTotal}.`);
+    log(`Combat: ${possessive(ownerName)} ${findCard(threat.shipId).name} attack ${shipRating(threat, 'atk')} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(player.name)} defense ${shipRating(defenderShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
     if (defTotal >= atkTotal) {
       log(`${player.name} beats back the attack and captures the pirate ship!`);
@@ -442,7 +444,7 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
     const atkRoll = rollDie(), defRoll = rollDie();
     const atkTotal = shipRating(attackerShip, 'atk') + atkRoll;
     const defTotal = shipRating(seaShip, 'def') - defPenalty + defRoll;
-    log(`Combat: ${possessive(attacker.name)} attack ${shipRating(attackerShip, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(ownerName)} ${findCard(seaShip.shipId).name} defense ${shipRating(seaShip, 'def') - defPenalty}+${defRoll}=${defTotal}.`);
+    log(`Combat: ${possessive(attacker.name)} attack ${shipRating(attackerShip, 'atk')} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(ownerName)} ${findCard(seaShip.shipId).name} defense ${shipRating(seaShip, 'def') - defPenalty} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
     if (defTotal >= atkTotal) {
       log(`${possessive(ownerName)} ${findCard(seaShip.shipId).name} holds them off!`);
@@ -487,7 +489,7 @@ function resolveCounterAttack(attacker, seaShip, onDone) {
   const atkRoll = rollDie(), defRoll = rollDie();
   const atkTotal = shipRating(seaShip, 'atk') + atkRoll;
   const defTotal = shipRating(attackerShip, 'def') + defRoll;
-  log(`Counter-attack: ${possessive(ownerName)} ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk')}+${atkRoll}=${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')}+${defRoll}=${defTotal}.`);
+  log(`Counter-attack: ${possessive(ownerName)} ${findCard(seaShip.shipId).name} attack ${shipRating(seaShip, 'atk')} (attack) + ${atkRoll} (roll) = ${atkTotal} vs ${possessive(attacker.name)} defense ${shipRating(attackerShip, 'def')} (defense) + ${defRoll} (roll) = ${defTotal}.`);
 
   if (atkTotal > defTotal) {
     log(`${possessive(attacker.name)} ship is overwhelmed!`);

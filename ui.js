@@ -217,6 +217,20 @@ function renderLog() {
 
 // ── Hand & action bar ───────────────────────────────────────────────────
 
+// Groups hand cards by category (preserving first-seen category order),
+// with the 'ship' group always last so ships render at the far right of
+// the hand row (Boss, 2026-08-24).
+function groupHandByCategory(hand) {
+  const buckets = new Map();
+  const order = [];
+  hand.forEach(entry => {
+    if (!buckets.has(entry.category)) { buckets.set(entry.category, []); order.push(entry.category); }
+    buckets.get(entry.category).push(entry);
+  });
+  order.sort((a, b) => (a === 'ship') - (b === 'ship'));
+  return order.flatMap(cat => buckets.get(cat));
+}
+
 function renderHandAndActions() {
   const human = state.players.find(p => p.isHuman);
   const isHumanTurn = state.players[state.currentTurn].isHuman;
@@ -230,7 +244,7 @@ function renderHandAndActions() {
   if (!activeShip) uiActiveSeaShipId = null; // target got captured/sunk/lost since selection
   const eligibleUids = activeShip ? new Set(loadEligibleHandCards(human, activeShip).map(c => c.uid)) : null;
 
-  human.hand.forEach(entry => {
+  groupHandByCategory(human.hand).forEach(entry => {
     const card = findCard(entry.cardId);
     const wrap = document.createElement('div');
     const isLoadEligible = eligibleUids && eligibleUids.has(entry.uid);
@@ -306,9 +320,13 @@ function renderHandAndActions() {
     btn.onclick = () => { finishShipsToSea(); render(); };
     actionsEl.appendChild(btn);
   } else if (state.phase === 'draw') {
+    const shipCount = human.hand.filter(c => c.category === 'ship').length;
+    const atShipCap = shipCount >= MAX_HAND_SHIPS;
     const remaining = SHIPS_TO_SEA_CAP - human.shipsDrawnThisTurn;
-    actionsEl.appendChild(phaseNote(`Drew a ship this turn. You may draw up to ${remaining} more from your ship pile before ending your turn.`));
-    if (remaining > 0 && human.shipDrawPile.length) {
+    actionsEl.appendChild(phaseNote(atShipCap
+      ? `Your hand is full of ships (${shipCount}/${MAX_HAND_SHIPS}) — put some out to sea before drawing more.`
+      : `Drew a ship this turn. You may draw up to ${remaining} more from your ship pile before ending your turn.`));
+    if (remaining > 0 && human.shipDrawPile.length && !atShipCap) {
       addAction(actionsEl, `Draw Another Ship (${human.shipsDrawnThisTurn}/${SHIPS_TO_SEA_CAP})`, () => { humanDrawAnotherShip(); render(); });
     }
     addAction(actionsEl, 'End Turn', () => { finishDrawPhase(); render(); scheduleAiIfNeeded(); });
