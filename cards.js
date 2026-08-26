@@ -17,6 +17,10 @@ const SHIPS = [
   { id: 'ship-fluyt',       name: 'Fluyt',             rarity: 'Common', atk: 1, def: 4, spd: 3, shipType: 'Any', value: 320 },
   { id: 'ship-pinnace',     name: 'Pinnace',           rarity: 'Common', atk: 2, def: 2, spd: 4, shipType: 'Any', value: 320 },
   { id: 'ship-schooner',    name: 'Schooner',          rarity: 'Common', atk: 3, def: 2, spd: 4, shipType: 'Any', value: 360 },
+  // Starter-only (Boss, 2026-08-26) -- fixed 4/2/3 hull, never drawn from
+  // the regular ship pile (see buildShipPile's `starter` exclusion below),
+  // same pattern as starter-flagged crew in buildDeck().
+  { id: 'ship-derelict',    name: 'Derelict',          rarity: 'Common', atk: 4, def: 2, spd: 3, shipType: 'Any', value: 360, starter: true },
   { id: 'ship-sotl',        name: 'Ship-of-the-Line',  rarity: 'Uncommon', atk: 5, def: 5, spd: 1, shipType: 'Pirate Hunter', value: 440 },
   { id: 'ship-frigate',     name: 'Frigate',           rarity: 'Uncommon', atk: 5, def: 4, spd: 1, shipType: 'Any', value: 400 },
   { id: 'ship-galleon',     name: 'Galleon',           rarity: 'Uncommon', atk: 4, def: 5, spd: 1, shipType: 'Any', value: 400 },
@@ -213,7 +217,7 @@ const SHIP_COPIES_BY_RARITY = { Common: 4, Uncommon: 2, Rare: 1 };
 function buildShipPile() {
   const pile = [];
   let seq = 0;
-  SHIPS.forEach(s => {
+  SHIPS.filter(s => !s.starter).forEach(s => {
     const copies = SHIP_COPIES_BY_RARITY[s.rarity] || 2;
     for (let i = 0; i < copies; i++) {
       pile.push({ uid: `s${seq++}`, cardId: s.id, category: 'ship', faceUp: false });
@@ -223,10 +227,12 @@ function buildShipPile() {
 }
 
 function pickStarterShip() {
-  // Any ship whose atk+def+spd totals 9 or less (bumped from 7, Boss
-  // 2026-08-21 -- starter-mode combat was too weak, see the win-rate data
-  // in that day's notes).
-  const eligible = SHIPS.filter(s => s.atk + s.def + s.spd <= 9);
+  // Fixed 4/2/3 Derelict (Boss, 2026-08-26) -- replaced the old random pick
+  // from any ship totaling <=9 (itself bumped from <=7 on 2026-08-21) after
+  // a too-weak (1 or 2) starting attack made early combat unwinnable.
+  // Filter+random rather than a direct id lookup, mirroring pickStarterCrew
+  // below, in case more starter-flagged ships get added later.
+  const eligible = SHIPS.filter(s => s.starter);
   return eligible[Math.floor(Math.random() * eligible.length)];
 }
 
