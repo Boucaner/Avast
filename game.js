@@ -303,10 +303,12 @@ function sinkOrCapture(winnerPlayer, shipObj, onDone) {
     onDone && onDone();
   } else {
     log(`${winnerPlayer.name} rolls ${sinkRoll} — the ship is theirs. Added to the capture pile.`);
+    const shipCard = { uid: 'ship-' + Math.random(), cardId: shipObj.shipId, category: 'ship' };
+    const captured = [shipCard, ...attachmentCards];
+    log(`Captured: ${captured.map(c => findCard(c.cardId).name).join(', ')}.`);
     const crewEntry = attachmentCards.find(c => c.category === 'crew');
     const rest = attachmentCards.filter(c => c !== crewEntry);
-    const cards = [{ uid: 'ship-' + Math.random(), cardId: shipObj.shipId, category: 'ship' }, ...rest];
-    winnerPlayer.capturePile.push(...cards);
+    winnerPlayer.capturePile.push(shipCard, ...rest);
     if (crewEntry) return offerCrewSwap(winnerPlayer, crewEntry, onDone);
     onDone && onDone();
   }

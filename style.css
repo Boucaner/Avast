@@ -116,6 +116,12 @@ html, body {
   display: flex; flex-direction: column; gap: 4px;
   margin-top: 8px; font-size: .78rem; color: #bbb;
 }
+.capture-pile-link {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.capture-pile-link:hover { color: var(--gold); }
 
 #ocean {
   min-height: 0;

@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1b4332">
-  <link rel="stylesheet" href="style.css?v=0.9.5">
+  <link rel="stylesheet" href="style.css?v=0.9.6">
 </head>
 <body>
   <div id="app">
@@ -18,7 +18,7 @@
         <span id="game-title">Avast!</span>
         <a class="back-to-hub" href="https://freeappstoenjoy.com">&larr; All Games and Apps</a>
       </div>
-      <span id="build-tag" style="font-size:.65rem;color:#555;letter-spacing:1px;">v0.9.5</span>
+      <span id="build-tag" style="font-size:.65rem;color:#555;letter-spacing:1px;">v0.9.6</span>
       <div id="topbar-controls">
         <button id="btn-new-game">New Game</button>
       </div>
@@ -108,6 +108,17 @@
     </div>
   </div>
 
+  <!-- Capture pile viewer (either player, viewable any time) -->
+  <div id="modal-capture-view" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="capture-view-title">Capture Pile</h2>
+      <div id="capture-view-cards" class="hand-row"></div>
+      <div class="modal-actions">
+        <button id="btn-capture-view-close" class="action-btn primary">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Game over modal -->
   <div id="modal-gameover" class="modal hidden">
     <div class="modal-box">
@@ -119,8 +130,8 @@
     </div>
   </div>
 
-  <script src="cards.js?v=0.9.5"></script>
-  <script src="game.js?v=0.9.5"></script>
-  <script src="ui.js?v=0.9.5"></script>
+  <script src="cards.js?v=0.9.6"></script>
+  <script src="game.js?v=0.9.6"></script>
+  <script src="ui.js?v=0.9.6"></script>
 </body>
 </html>

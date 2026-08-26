@@ -101,11 +101,33 @@ function renderPlayerShipZone(zoneEl, player) {
   stats.className = 'ship-econ';
   stats.innerHTML = `
     <span>Stash: <strong>${player.stash}g</strong></span>
-    <span>Capture pile: ${player.capturePile.length} card${player.capturePile.length === 1 ? '' : 's'} (~${captureValue}g)</span>
     <span>Discard: ${player.discardPile.length} card${player.discardPile.length === 1 ? '' : 's'}</span>
     <span>Hand: ${player.hand.length}</span>
   `;
+  const captureLink = document.createElement('span');
+  captureLink.className = 'capture-pile-link';
+  captureLink.textContent = `Capture pile: ${player.capturePile.length} card${player.capturePile.length === 1 ? '' : 's'} (~${captureValue}g)`;
+  captureLink.onclick = () => openCapturePileView(player);
+  stats.insertBefore(captureLink, stats.children[1]);
   zoneEl.appendChild(stats);
+}
+
+// ── Capture pile viewer (either player, viewable any time -- not gated to
+// Home Port like the discard/upgrade reveals; Boss, 2026-08-26) ──────────
+
+function openCapturePileView(player) {
+  $('capture-view-title').textContent = `${possessive(player.name)} Capture Pile`;
+  const el = $('capture-view-cards');
+  el.innerHTML = '';
+  if (player.capturePile.length) {
+    player.capturePile.forEach(entry => {
+      const card = findCard(entry.cardId);
+      if (card) el.appendChild(makeCardEl(card, entry.category));
+    });
+  } else {
+    el.innerHTML = '<p class="phase-note">Empty.</p>';
+  }
+  $('modal-capture-view').classList.remove('hidden');
 }
 
 // ── Ocean (shared ships-at-sea) ─────────────────────────────────────────
@@ -672,4 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('btn-crew-swap-accept').onclick = () => { humanCrewSwapChoice(true); render(); scheduleAiIfNeeded(); };
   $('btn-crew-swap-decline').onclick = () => { humanCrewSwapChoice(false); render(); scheduleAiIfNeeded(); };
+
+  $('btn-capture-view-close').onclick = () => { $('modal-capture-view').classList.add('hidden'); };
 });
