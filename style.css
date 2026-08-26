@@ -158,6 +158,12 @@ html, body {
   flex: 0 0 33%;
   min-width: 0;
   min-height: 0;
+  /* Matches #hand's own max-height formula below, plus room for the
+     action bar under it (so the log roughly matches the hand column's
+     natural height without literally measuring it) -- #log had no height
+     cap at all right after the v0.9.3 layout rework, so every new log
+     line grew #player-zone and shrank #table above it (Boss, 2026-08-26). */
+  max-height: calc(var(--card-h) * 2 + 90px);
   overflow-y: auto;
   background: rgba(0,0,0,.35);
   border-radius: 10px;
