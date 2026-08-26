@@ -148,9 +148,16 @@ html, body {
 .sea-ship-rating { color: var(--gold); font-variant-numeric: tabular-nums; }
 .sea-ship-actions { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-#log {
+#player-zone-columns {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
   min-height: 0;
-  max-height: 90px;
+}
+#log {
+  flex: 0 0 33%;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   background: rgba(0,0,0,.35);
   border-radius: 10px;
@@ -158,6 +165,13 @@ html, body {
   font-size: .74rem;
   color: #ccc;
   border: 1px solid rgba(255,255,255,.06);
+}
+#hand-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
 .log-line:last-child { color: var(--gold); font-weight: 600; }
@@ -307,6 +321,11 @@ html, body {
   #ocean { grid-area: center; }
   #zone-you { grid-area: bottom; }
   .ship-zone { max-height: 30vh; }
+
+  /* Log-left/hand-right doesn't have room on narrower screens -- fall back
+     to the old stacked layout (log above hand above action bar). */
+  #player-zone-columns { flex-direction: column; }
+  #log { flex: 0 0 auto; max-height: 90px; }
 }
 @media (max-width: 600px) {
   :root { --card-w: 64px; --card-h: 84px; }
