@@ -96,7 +96,7 @@ function renderPlayerShipZone(zoneEl, player) {
   zoneEl.appendChild(header);
   zoneEl.appendChild(buildShipSlotsEl(player.ship, true));
 
-  const captureValue = player.capturePile.reduce((s, e) => { const c = findCard(e.cardId); return s + (c ? cardSellValue(c) : 0); }, 0);
+  const captureValue = player.capturePile.reduce((s, e) => { const c = findCard(e.cardId); return s + (c ? cardSellValue(c, e.category) : 0); }, 0);
   const stats = document.createElement('div');
   stats.className = 'ship-econ';
   stats.innerHTML = `
@@ -154,7 +154,7 @@ function renderOcean() {
     oceanEl.appendChild(p);
   }
 
-  const inLoadMode = isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap && state.phase === 'shipsToSea';
+  const inLoadMode = isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap && !state.pendingCaptainChoice && !state.pendingOfficerSwap && state.phase === 'shipsToSea';
 
   state.seaShips.forEach(seaShip => {
     const isOwnShip = seaShip.ownerIdx === humanIdx;
@@ -181,7 +181,7 @@ function renderOcean() {
 
     const actions = document.createElement('div');
     actions.className = 'sea-ship-actions';
-    if (isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap) {
+    if (isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap && !state.pendingCaptainChoice && !state.pendingOfficerSwap) {
       if (state.phase === 'attack') {
         const btn = document.createElement('button');
         btn.className = 'mini-btn';
@@ -223,7 +223,7 @@ function renderTurnIndicator() {
   }
 
   el.innerHTML = `
-    <span class="ti-turn">${isHumanTurn ? 'Your Turn' : `${player.name}'s Turn`}</span>
+    <span class="ti-turn">${player.name === 'You' ? 'Your Turn' : `${player.name}'s Turn`}</span>
     <span class="ti-sep">·</span>
     <span class="ti-phase">${phaseLabel}</span>
   `;
@@ -275,7 +275,7 @@ function renderHandAndActions() {
     const cardEl = makeCardEl(card, entry.category);
     wrap.appendChild(cardEl);
 
-    if (isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap) {
+    if (isHumanTurn && !state.pendingFlee && !state.pendingCrewSwap && !state.pendingCaptainChoice && !state.pendingOfficerSwap) {
       if (state.phase === 'shipsToSea' && entry.category === 'ship') {
         const oceanFull = state.seaShips.length >= SHIPS_AT_SEA_CAP;
         const btn = document.createElement('button');
@@ -316,6 +316,8 @@ function renderHandAndActions() {
   }
   if (state.pendingFlee) return; // flee modal handles this
   if (state.pendingCrewSwap) return; // crew swap modal handles this
+  if (state.pendingCaptainChoice) return; // captain choice modal handles this
+  if (state.pendingOfficerSwap) return; // officer swap modal handles this
 
   if (state.phase === 'turnStart') {
     addAction(actionsEl, 'Set Sail', () => { beginRegularTurn(); render(); });
@@ -377,12 +379,46 @@ function addAction(container, label, handler) {
 // Port instead of selling -- UI-only selection state, reset whenever the
 // modal is freshly opened (not on an internal re-render from a toggle).
 let uiHomePortEquipUids = new Set();
+// Crew/officer picked to sail with next voyage: null means "keep whichever
+// one was just aboard" -- { uid } means a specific capture-pile card
+// (Boss, 2026-08-28 economy rework; replaces the old retain-crew checkbox).
+let uiHomePortCrewChoice = null;
+let uiHomePortOfficerChoice = null;
+
+// Shared renderer for the crew and officer "who sails next" pickers -- same
+// shape for both, just a different category/current-attachment/UI-state.
+function renderHomePortNextPicker(human, category, current, getChoice, setChoice, labelEl, containerEl) {
+  const candidates = [];
+  if (current) candidates.push({ uid: null, cardId: current.cardId });
+  human.capturePile.filter(e => e.category === category).forEach(e => candidates.push({ uid: e.uid, cardId: e.cardId }));
+
+  containerEl.innerHTML = '';
+  if (!candidates.length) { labelEl.classList.add('hidden'); return; }
+  labelEl.classList.remove('hidden');
+  labelEl.textContent = `Choose your ${category} for the next voyage (no extra fee either way):`;
+  const chosen = getChoice();
+  candidates.forEach(cand => {
+    const card = findCard(cand.cardId);
+    if (!card) return;
+    const isSelected = chosen ? chosen.uid === cand.uid : cand.uid === null;
+    const wrap = document.createElement('div');
+    wrap.className = 'hand-card-wrap' + (isSelected ? ' equip-selected' : '');
+    wrap.appendChild(makeCardEl(card, category));
+    const btn = document.createElement('button');
+    btn.className = 'mini-btn';
+    btn.textContent = isSelected ? 'Sailing with this ✓' : 'Choose';
+    btn.onclick = () => { setChoice(cand.uid === null ? null : { uid: cand.uid }); openHomePortModal(); };
+    wrap.appendChild(btn);
+    containerEl.appendChild(wrap);
+  });
+}
 
 function openHomePortModal() {
   const human = state.players.find(p => p.isHuman);
   if ($('modal-homeport').classList.contains('hidden')) {
     uiHomePortEquipUids = new Set();
-    $('homeport-retain-crew').checked = false;
+    uiHomePortCrewChoice = null;
+    uiHomePortOfficerChoice = null;
   }
 
   const captureUpgrades = human.capturePile.filter(e => e.category === 'upgrade');
@@ -390,7 +426,7 @@ function openHomePortModal() {
   const captureValue = human.capturePile.reduce((s, e) => {
     if (uiHomePortEquipUids.has(e.uid)) return s; // equipping instead of selling
     const c = findCard(e.cardId);
-    return s + (c ? cardSellValue(c) : 0);
+    return s + (c ? cardSellValue(c, e.category) : 0);
   }, 0);
   const ship = human.ship;
   let upkeep = 0;
@@ -400,26 +436,20 @@ function openHomePortModal() {
 
   $('homeport-summary').innerHTML = `
     <p>Selling your capture pile (${soldCount} card${soldCount === 1 ? '' : 's'}): <strong>+${captureValue}g</strong></p>
-    <p>Crew/officer upkeep: <strong>-${upkeep}g</strong>${upkeep > available ? ' — you can\'t cover this! You\'ll lose your ship and upgrades, reverting to your starter.' : ''}</p>
+    <p>Crew/officer upkeep (wages for the voyage just finished): <strong>-${upkeep}g</strong>${upkeep > available ? ' — you can\'t cover this! You\'ll lose your ship and upgrades, reverting to your starter.' : ''}</p>
   `;
 
-  // Retaining crew only makes sense if keeping the current ship -- it's
-  // ignored server-side too if a ship swap is chosen instead, but hiding it
-  // here avoids offering a choice that wouldn't do anything (Boss, 2026-08-24).
-  const retainRow = $('homeport-retain-row');
-  const retainCheckbox = $('homeport-retain-crew');
-  if (ship.crew && upkeep <= available) {
-    const retainCost = findCard(ship.crew.cardId).value || 0;
-    const canAfford = available >= upkeep + retainCost;
-    retainRow.classList.remove('hidden');
-    retainCheckbox.disabled = !canAfford;
-    if (!canAfford) retainCheckbox.checked = false;
-    $('homeport-retain-label').textContent = canAfford
-      ? `Pay ${retainCost}g more to keep your ${findCard(ship.crew.cardId).name} for the next voyage (only if you keep your current ship)`
-      : `Can't afford to retain your ${findCard(ship.crew.cardId).name} (needs ${retainCost}g more)`;
+  // Crew & officer for the next voyage: free choice among the one just paid
+  // for above and anything sitting in the capture pile. Moot on a mutiny --
+  // everything resets to the starter crew regardless.
+  if (upkeep <= available) {
+    renderHomePortNextPicker(human, 'crew', ship.crew, () => uiHomePortCrewChoice, v => uiHomePortCrewChoice = v, $('homeport-crew-label'), $('homeport-crew-choices'));
+    renderHomePortNextPicker(human, 'officer', ship.officer, () => uiHomePortOfficerChoice, v => uiHomePortOfficerChoice = v, $('homeport-officer-label'), $('homeport-officer-choices'));
   } else {
-    retainRow.classList.add('hidden');
-    retainCheckbox.checked = false;
+    $('homeport-crew-label').classList.add('hidden');
+    $('homeport-crew-choices').innerHTML = '';
+    $('homeport-officer-label').classList.add('hidden');
+    $('homeport-officer-choices').innerHTML = '';
   }
 
   // Captured upgrades: equip free (the only place this can happen), or leave
@@ -479,7 +509,7 @@ function openHomePortModal() {
     const card = findCard(entry.cardId);
     addChoice(card, `Buy & Sail (${card.value}g)`, () => {
       $('modal-homeport').classList.add('hidden');
-      doHomePort(human, { source: 'hand', uid: entry.uid }, Array.from(uiHomePortEquipUids));
+      doHomePort(human, { source: 'hand', uid: entry.uid }, Array.from(uiHomePortEquipUids), uiHomePortCrewChoice, uiHomePortOfficerChoice);
       render();
       scheduleAiIfNeeded();
     });
@@ -490,7 +520,7 @@ function openHomePortModal() {
     const card = findCard(entry.cardId);
     addChoice(card, 'Sail with this (free)', () => {
       $('modal-homeport').classList.add('hidden');
-      doHomePort(human, { source: 'capture', uid: entry.uid }, Array.from(uiHomePortEquipUids));
+      doHomePort(human, { source: 'capture', uid: entry.uid }, Array.from(uiHomePortEquipUids), uiHomePortCrewChoice, uiHomePortOfficerChoice);
       render();
       scheduleAiIfNeeded();
     });
@@ -569,12 +599,53 @@ function renderCrewSwapModal() {
   }
 }
 
+// ── Captain choice modal (ransom or become their avatar) ─────────────────
+
+function renderCaptainChoiceModal() {
+  const modal = $('modal-captain-choice');
+  if (state.pendingCaptainChoice) {
+    const human = state.players.find(p => p.isHuman);
+    const capCard = findCard(state.pendingCaptainChoice.captainCardId);
+    const ransomValue = cardSellValue(capCard);
+    $('captain-choice-desc').textContent = `You've captured ${capCard.name}. Ransom them for ${ransomValue}g, or become them yourself — permanently, for the rest of the game? If you become them, any captain currently aboard your ship is discarded.`;
+    $('btn-captain-choice-ransom').textContent = `Ransom (${ransomValue}g)`;
+    $('btn-captain-choice-become').textContent = `Become ${capCard.name}`;
+    const preview = $('captain-choice-preview');
+    preview.innerHTML = '';
+    preview.appendChild(makeCardEl(capCard, 'captain'));
+    modal.classList.remove('hidden');
+  } else {
+    modal.classList.add('hidden');
+  }
+}
+
+// ── Officer swap modal (mirrors the crew "volunteers" offer) ─────────────
+
+function renderOfficerSwapModal() {
+  const modal = $('modal-officer-swap');
+  if (state.pendingOfficerSwap) {
+    const human = state.players.find(p => p.isHuman);
+    const newCard = findCard(state.pendingOfficerSwap.officerCardId);
+    const oldEntry = human.ship.officer;
+    const oldCard = oldEntry ? findCard(oldEntry.cardId) : null;
+    $('officer-swap-desc').textContent = oldCard
+      ? `Swap in the captured ${newCard.name} in place of your current ${oldCard.name}? Your current officer will be discarded.`
+      : `Sign on the captured ${newCard.name} as your officer?`;
+    const preview = $('officer-swap-preview');
+    preview.innerHTML = '';
+    preview.appendChild(makeCardEl(newCard, 'officer'));
+    modal.classList.remove('hidden');
+  } else {
+    modal.classList.add('hidden');
+  }
+}
+
 // ── Game over ────────────────────────────────────────────────────────────
 
 function renderGameOver() {
   const modal = $('modal-gameover');
   if (state.phase === 'gameover' && state.winner) {
-    $('gameover-title').textContent = state.winner.isHuman ? 'You win!' : `${state.winner.name} wins!`;
+    $('gameover-title').textContent = state.winner.name === 'You' ? 'You win!' : `${state.winner.name} wins!`;
     $('gameover-desc').textContent = `Final stash: ${state.players.map(p => `${p.name} ${p.stash}g`).join(' vs. ')}`;
     modal.classList.remove('hidden');
     if (state.winner.isHuman && !state._confettiShown) {
@@ -627,7 +698,7 @@ function runAiStep() {
 
   if (state.phase === 'turnStart') {
     if (aiWantsHomePort(cur)) {
-      doHomePort(cur, aiChooseHomePortShip(cur), aiChooseHomePortUpgrades(cur), aiWantsRetainCrew(cur));
+      doHomePort(cur, aiChooseHomePortShip(cur), aiChooseHomePortUpgrades(cur), aiChooseHomePortCrew(cur), aiChooseHomePortOfficer(cur));
     } else {
       beginRegularTurn();
     }
@@ -659,6 +730,8 @@ function render() {
   renderHandAndActions();
   renderFleeModal();
   renderCrewSwapModal();
+  renderCaptainChoiceModal();
+  renderOfficerSwapModal();
   renderGameOver();
 }
 
@@ -681,13 +754,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('btn-homeport-confirm').onclick = () => {
     const human = state.players.find(p => p.isHuman);
-    const retainCrew = $('homeport-retain-crew').checked;
     $('modal-homeport').classList.add('hidden');
-    doHomePort(human, null, Array.from(uiHomePortEquipUids), retainCrew);
+    doHomePort(human, null, Array.from(uiHomePortEquipUids), uiHomePortCrewChoice, uiHomePortOfficerChoice);
     render();
     scheduleAiIfNeeded();
   };
   $('btn-homeport-cancel').onclick = () => { $('modal-homeport').classList.add('hidden'); };
+
+  $('btn-captain-choice-ransom').onclick = () => { humanCaptainChoice(false); render(); scheduleAiIfNeeded(); };
+  $('btn-captain-choice-become').onclick = () => { humanCaptainChoice(true); render(); scheduleAiIfNeeded(); };
+
+  $('btn-officer-swap-accept').onclick = () => { humanOfficerSwapChoice(true); render(); scheduleAiIfNeeded(); };
+  $('btn-officer-swap-decline').onclick = () => { humanOfficerSwapChoice(false); render(); scheduleAiIfNeeded(); };
 
   $('btn-flee-attempt').onclick = () => { humanFleeChoice(true); render(); scheduleAiIfNeeded(); };
   $('btn-flee-stand').onclick = () => { humanFleeChoice(false); render(); scheduleAiIfNeeded(); };

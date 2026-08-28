@@ -71,6 +71,15 @@ function newShipInstance(shipId, crewCardId) {
   };
 }
 
+// Once a player becomes a captured captain's avatar (see offerCaptainChoice),
+// that captain permanently occupies their player ship's captain slot -- on
+// this ship, and on any future one. Call this right after every
+// `player.ship = newShipInstance(...)` reassignment so the identity actually
+// follows them (Boss, 2026-08-28).
+function reattachAvatarCaptain(player) {
+  if (player.avatarCaptainId) player.ship.captain = { cardId: player.avatarCaptainId, faceUp: true, isAvatar: true };
+}
+
 function shipAttachments(ship) {
   const list = [];
   if (ship.captain) list.push(ship.captain);
@@ -103,7 +112,16 @@ function statTotal(card) { return (card.atk || 0) + (card.def || 0) + (card.spd 
 
 // Most cards price their gold value in `value`; upgrades use `sellValue`
 // instead (they have no buy cost anymore -- capture-only, free to equip).
-function cardSellValue(card) { return card.value != null ? card.value : (card.sellValue != null ? card.sellValue : 0); }
+// Captains have neither -- their `cost` doubles as ransom value. Crew and
+// officers are never a gold source at all (Boss, 2026-08-28): they're paid
+// for as upkeep when used, never sold, so they always ring up as 0 here
+// regardless of their own value/cost field.
+function cardSellValue(card, category) {
+  if (category === 'crew' || category === 'officer') return 0;
+  if (card.value != null) return card.value;
+  if (card.sellValue != null) return card.sellValue;
+  return card.cost != null ? card.cost : 0;
+}
 
 function shipIsPirateType(ship) {
   const base = findCard(ship.shipId);
@@ -170,6 +188,7 @@ function makePlayer(name, isHuman) {
     shipsToSeaThisTurn: 0,
     isFirstTurn: true,
     firstTurnAfterLoss: false,
+    avatarCaptainId: null, // set permanently once the player becomes a captured captain
   };
   drawToHand(player, MAX_HAND);
   for (let i = 0; i < 3; i++) drawOneShip(player, true); // starting hand must include 3 ships
@@ -291,8 +310,9 @@ function humanFleeChoice(attemptFlee) {
 }
 
 // A ship-at-sea is captured (or sunk) into winnerPlayer's piles. Async via
-// onDone -- a captured crew card triggers the "volunteers" swap-in offer
-// below, which pauses for a human decision the same way flee decisions do.
+// onDone -- a captured captain/crew/officer card each trigger their own
+// immediate offer below, chained in that order, which pause for a human
+// decision the same way flee decisions do.
 function sinkOrCapture(winnerPlayer, shipObj, onDone) {
   const sinkRoll = rollDie();
   const attachmentCards = shipAttachments(shipObj).map(e => ({ uid: e.cardId + '-' + Math.random(), cardId: e.cardId, category: categoryOf(e.cardId) }));
@@ -306,20 +326,73 @@ function sinkOrCapture(winnerPlayer, shipObj, onDone) {
     const shipCard = { uid: 'ship-' + Math.random(), cardId: shipObj.shipId, category: 'ship' };
     const captured = [shipCard, ...attachmentCards];
     log(`Captured: ${captured.map(c => findCard(c.cardId).name).join(', ')}.`);
+    const captainEntry = attachmentCards.find(c => c.category === 'captain');
     const crewEntry = attachmentCards.find(c => c.category === 'crew');
-    const rest = attachmentCards.filter(c => c !== crewEntry);
+    const officerEntry = attachmentCards.find(c => c.category === 'officer');
+    const rest = attachmentCards.filter(c => c !== captainEntry && c !== crewEntry && c !== officerEntry);
     winnerPlayer.capturePile.push(shipCard, ...rest);
-    if (crewEntry) return offerCrewSwap(winnerPlayer, crewEntry, onDone);
-    onDone && onDone();
+
+    const afterOfficer = () => onDone && onDone();
+    const afterCrew = () => officerEntry ? offerOfficerSwap(winnerPlayer, officerEntry, afterOfficer) : afterOfficer();
+    const afterCaptain = () => crewEntry ? offerCrewSwap(winnerPlayer, crewEntry, afterCrew) : afterCrew();
+    if (captainEntry) return offerCaptainChoice(winnerPlayer, captainEntry, afterCaptain);
+    afterCaptain();
   }
+}
+
+// Ransom-or-avatar (Boss, 2026-08-28): capturing an enemy captain offers a
+// one-time choice, only while the winner has no avatar captain yet -- ransom
+// (the captain joins the capture pile as normal loot, sold at Home Port for
+// its cost) or become them (the captain permanently fills the winner's own
+// player ship's captain slot, follows them to any future ship, and is immune
+// to capture/sinking since it's now part of who they are, not cargo). Once a
+// player has an avatar, any captain captured afterward skips this offer
+// entirely -- ransom only, never placeable on a ship.
+function offerCaptainChoice(winnerPlayer, captainEntry, onDone) {
+  if (winnerPlayer.avatarCaptainId) {
+    winnerPlayer.capturePile.push(captainEntry);
+    return onDone && onDone();
+  }
+  const decide = (becomeAvatar) => {
+    if (becomeAvatar) {
+      const capCard = findCard(captainEntry.cardId);
+      const oldCaptain = winnerPlayer.ship.captain;
+      if (oldCaptain) winnerPlayer.discardPile.push({ uid: 'disc' + Math.random(), cardId: oldCaptain.cardId, category: 'captain' });
+      winnerPlayer.ship.captain = { cardId: captainEntry.cardId, faceUp: true, isAvatar: true };
+      winnerPlayer.avatarCaptainId = captainEntry.cardId;
+      winnerPlayer.name = winnerPlayer.isHuman ? `${capCard.name} (You)` : capCard.name;
+      log(`${winnerPlayer.name} takes on the identity of ${capCard.name} — permanently, for the rest of the voyage and beyond.`);
+    } else {
+      winnerPlayer.capturePile.push(captainEntry);
+    }
+    onDone && onDone();
+  };
+  if (!winnerPlayer.isHuman) {
+    return decide(aiWantsCaptainAvatar(winnerPlayer, captainEntry));
+  }
+  state.pendingCaptainChoice = { captainCardId: captainEntry.cardId, callback: decide };
+}
+
+function humanCaptainChoice(becomeAvatar) {
+  if (!state.pendingCaptainChoice) return;
+  const { callback } = state.pendingCaptainChoice;
+  state.pendingCaptainChoice = null;
+  callback(becomeAvatar);
+}
+
+// AI always takes the permanent stat bonus over a one-time ransom payout --
+// straightforwardly better long-term, matching how eagerly aiWantsCrewSwap
+// accepts a strict upgrade.
+function aiWantsCaptainAvatar(player, captainEntry) {
+  return true;
 }
 
 // "Volunteers" (Boss, 2026-08-24): capturing a crew card offers an immediate
 // swap onto the winner's own ship, right as the capture resolves -- not a
 // Home Port thing. Accepting discards the old crew straight to the discard
 // pile and skips the capture pile entirely for both cards; declining sends
-// the captured crew to the capture pile as normal loot (sold or otherwise
-// handled like anything else there).
+// the captured crew to the capture pile as normal loot (never sold for gold
+// itself -- see cardSellValue -- but selectable again at Home Port).
 function offerCrewSwap(winnerPlayer, crewEntry, onDone) {
   const decide = (accept) => {
     if (accept) {
@@ -336,6 +409,42 @@ function offerCrewSwap(winnerPlayer, crewEntry, onDone) {
     return decide(aiWantsCrewSwap(winnerPlayer, crewEntry));
   }
   state.pendingCrewSwap = { crewCardId: crewEntry.cardId, callback: decide };
+}
+
+// Officer counterpart to offerCrewSwap above (Boss, 2026-08-28: officers get
+// the same immediate free swap-in crew already had -- previously scoped out
+// entirely).
+function offerOfficerSwap(winnerPlayer, officerEntry, onDone) {
+  const decide = (accept) => {
+    if (accept) {
+      const oldOfficer = winnerPlayer.ship.officer;
+      if (oldOfficer) winnerPlayer.discardPile.push({ uid: 'disc' + Math.random(), cardId: oldOfficer.cardId, category: 'officer' });
+      winnerPlayer.ship.officer = { cardId: officerEntry.cardId, faceUp: true };
+      log(`${winnerPlayer.name} takes on the captured ${findCard(officerEntry.cardId).name} as officer.`);
+    } else {
+      winnerPlayer.capturePile.push(officerEntry);
+    }
+    onDone && onDone();
+  };
+  if (!winnerPlayer.isHuman) {
+    return decide(aiWantsOfficerSwap(winnerPlayer, officerEntry));
+  }
+  state.pendingOfficerSwap = { officerCardId: officerEntry.cardId, callback: decide };
+}
+
+function humanOfficerSwapChoice(accept) {
+  if (!state.pendingOfficerSwap) return;
+  const { callback } = state.pendingOfficerSwap;
+  state.pendingOfficerSwap = null;
+  callback(accept);
+}
+
+function aiWantsOfficerSwap(player, officerEntry) {
+  const newCard = findCard(officerEntry.cardId);
+  const newTotal = totalBonus(newCard.bonus);
+  const oldCard = player.ship.officer ? findCard(player.ship.officer.cardId) : null;
+  const oldTotal = oldCard ? totalBonus(oldCard.bonus) : -1;
+  return newTotal > oldTotal;
 }
 
 function humanCrewSwapChoice(accept) {
@@ -366,7 +475,10 @@ function playerLosesShip(player) {
   const oldShip = player.ship;
   if (oldShip.shipId !== player.starterShipId) returnShipToPile(player, oldShip.shipId);
   const leftovers = [];
-  if (oldShip.captain) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.captain.cardId, category: 'captain' });
+  // An avatar captain is part of who the player is, not cargo -- it survives
+  // the loss and reattaches to the new ship below instead of being discarded
+  // (Boss, 2026-08-28: protected from capture/sinking).
+  if (oldShip.captain && oldShip.captain.cardId !== player.avatarCaptainId) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.captain.cardId, category: 'captain' });
   if (oldShip.crew && oldShip.crew.cardId !== player.starterCrewId) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.crew.cardId, category: 'crew' });
   if (oldShip.officer) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.officer.cardId, category: 'officer' });
   ['cannon', 'sails', 'hull'].forEach(slot => { if (oldShip.upgrades[slot]) leftovers.push({ uid: 'disc' + Math.random(), cardId: oldShip.upgrades[slot].cardId, category: 'upgrade' }); });
@@ -374,6 +486,7 @@ function playerLosesShip(player) {
   player.discardPile.push(...leftovers);
 
   player.ship = newShipInstance(player.starterShipId, player.starterCrewId);
+  reattachAvatarCaptain(player);
   player.firstTurnAfterLoss = true;
   if (player === state.players[state.currentTurn]) {
     state.turnEndedByLoss = true;
@@ -750,12 +863,13 @@ function endTurn() {
 // upgrade reaches the player's own ship (see the "Upgrade Phase removed"
 // rule in Avast Rules). Anything captured but not listed here just gets
 // sold along with the rest of the capture pile, same as always.
-// retainCrew: pay the current crew's value a second time to keep them
-// aboard for the next voyage instead of discarding them (Boss, 2026-08-24).
-// Only meaningful when keeping the current ship -- ignored if shipChoice is
-// set, since a crew never carries over onto a different ship.
+// crewChoice / officerChoice: { uid } of a capture-pile crew/officer entry
+// to sail with next voyage, or null/undefined to keep whichever one was
+// just aboard (Boss, 2026-08-28 economy rework -- wages for the crew/officer
+// that just sailed are paid unconditionally below; picking who sails next,
+// same one or any other captured one, costs nothing extra).
 
-function doHomePort(player, shipChoice, upgradeUidsToEquip, retainCrew) {
+function doHomePort(player, shipChoice, upgradeUidsToEquip, crewChoice, officerChoice) {
   state.phase = 'homeport';
   log(`${player.name} sails for Home Port.`);
 
@@ -765,25 +879,28 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, retainCrew) {
   }
   const equipUids = upgradeUidsToEquip || [];
   const toEquip = player.capturePile.filter(e => e.category === 'upgrade' && equipUids.includes(e.uid));
-  const wantsRetainCrew = !shipChoice && !!retainCrew;
+  const chosenCrewEntry = crewChoice && crewChoice.uid ? player.capturePile.find(e => e.uid === crewChoice.uid && e.category === 'crew') : null;
+  const chosenOfficerEntry = officerChoice && officerChoice.uid ? player.capturePile.find(e => e.uid === officerChoice.uid && e.category === 'officer') : null;
 
   // 1) Sell capture pile (excluding a ship being kept to sail with, and any
   // upgrades chosen to equip instead) -- any ship cards among the sold cards
-  // return to the ship pile, not discardPile
+  // return to the ship pile, not discardPile. Crew/officer cards always ring
+  // up as 0 here (see cardSellValue) whether or not they end up chosen below.
   let earned = 0;
   const toSell = player.capturePile.filter(e => e !== chosenCaptureEntry && !toEquip.includes(e));
   toSell.forEach(entry => {
     const card = findCard(entry.cardId);
-    if (card) earned += cardSellValue(card);
+    if (card) earned += cardSellValue(card, entry.category);
   });
   if (earned > 0) log(`${player.name} sells their haul for ${earned} gold.`);
   player.stash += earned;
   discardCards(player, toSell);
   player.capturePile = chosenCaptureEntry ? [chosenCaptureEntry] : [];
 
-  // 2) Pay crew/officer upkeep on the outgoing ship. Crew and officer are
-  // always discarded on return to Home Port (see Avast Rules' Card Types)
-  // -- unless the player pays for the crew a second time to retain them.
+  // 2) Pay crew/officer upkeep (wages) on the outgoing ship -- what's owed
+  // for the voyage just completed, due regardless of who sails next
+  // (Boss, 2026-08-28: "pirate crews were paid when the voyage ended, not
+  // before").
   const outgoingShip = player.ship;
   let upkeep = 0;
   if (outgoingShip.crew) upkeep += findCard(outgoingShip.crew.cardId).value || 0;
@@ -798,25 +915,27 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, retainCrew) {
     if (upkeep > 0) log(`${player.name} pays ${upkeep} gold in crew/officer upkeep.`);
   }
 
-  const retainingCrew = !forcedStarter && wantsRetainCrew && !!outgoingShip.crew;
-  if (retainingCrew) {
-    const retainCost = findCard(outgoingShip.crew.cardId).value || 0;
-    player.stash -= retainCost;
-    log(`${player.name} pays ${retainCost} more gold to keep the ${findCard(outgoingShip.crew.cardId).name} aboard for the next voyage.`);
-  } else if (outgoingShip.crew) {
-    player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.crew.cardId, category: 'crew' });
-  }
+  // 3) The outgoing crew/officer are discarded now that their wages are
+  // settled -- then freely pick crew & officer for the next voyage: the one
+  // just paid for, or any other one sitting in the capture pile. No fee
+  // either way. A mutiny (forcedStarter) wipes this choice -- back to
+  // nothing but the starter crew, same as before.
+  if (outgoingShip.crew) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.crew.cardId, category: 'crew' });
   if (outgoingShip.officer) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.officer.cardId, category: 'officer' });
 
-  // 3) Choose next ship. Whenever the ship is actually being replaced, the
+  const nextCrewCardId = forcedStarter ? null : (chosenCrewEntry ? chosenCrewEntry.cardId : (outgoingShip.crew ? outgoingShip.crew.cardId : null));
+  const nextOfficerCardId = forcedStarter ? null : (chosenOfficerEntry ? chosenOfficerEntry.cardId : (outgoingShip.officer ? outgoingShip.officer.cardId : null));
+
+  // 4) Choose next ship. Whenever the ship is actually being replaced, the
   // outgoing one truly leaves play: its own card returns to the ship pile
   // (unless it was the starter, which never came from a pile), and whatever
   // was still attached to it (captain/upgrades/cargo) goes to the discard
-  // pile rather than silently vanishing.
+  // pile rather than silently vanishing. An avatar captain is an exception --
+  // it's not cargo, it reattaches to the new ship below instead.
   function releaseOutgoingShip() {
     if (outgoingShip.shipId !== player.starterShipId) returnShipToPile(player, outgoingShip.shipId);
     const leftovers = [];
-    if (outgoingShip.captain) leftovers.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.captain.cardId, category: 'captain' });
+    if (outgoingShip.captain && outgoingShip.captain.cardId !== player.avatarCaptainId) leftovers.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.captain.cardId, category: 'captain' });
     ['cannon', 'sails', 'hull'].forEach(slot => { if (outgoingShip.upgrades[slot]) leftovers.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.upgrades[slot].cardId, category: 'upgrade' }); });
     outgoingShip.cargo.forEach(c => leftovers.push({ uid: 'disc' + Math.random(), cardId: c.cardId, category: categoryOf(c.cardId) }));
     player.discardPile.push(...leftovers);
@@ -826,6 +945,7 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, retainCrew) {
     if (chosenCaptureEntry) { returnShipToPile(player, chosenCaptureEntry.cardId); player.capturePile = []; }
     releaseOutgoingShip();
     player.ship = newShipInstance(player.starterShipId, player.starterCrewId);
+    reattachAvatarCaptain(player);
   } else if (shipChoice && shipChoice.source === 'hand') {
     const handEntry = player.hand.find(c => c.uid === shipChoice.uid && c.category === 'ship');
     const card = handEntry && findCard(handEntry.cardId);
@@ -834,20 +954,19 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, retainCrew) {
       player.hand = player.hand.filter(c => c.uid !== shipChoice.uid);
       releaseOutgoingShip();
       player.ship = newShipInstance(card.id);
+      reattachAvatarCaptain(player);
       log(`${player.name} buys the ${card.name} for ${card.value} gold.`);
-    } else {
-      if (!retainingCrew) outgoingShip.crew = null;
-      outgoingShip.officer = null;
     }
   } else if (chosenCaptureEntry) {
     releaseOutgoingShip();
     player.ship = newShipInstance(chosenCaptureEntry.cardId);
+    reattachAvatarCaptain(player);
     player.capturePile = [];
     log(`${player.name} takes the captured ${findCard(chosenCaptureEntry.cardId).name} as their new ship.`);
-  } else {
-    if (!retainingCrew) outgoingShip.crew = null;
-    outgoingShip.officer = null;
   }
+
+  if (nextCrewCardId) player.ship.crew = { cardId: nextCrewCardId, faceUp: true };
+  if (nextOfficerCardId) player.ship.officer = { cardId: nextOfficerCardId, faceUp: true };
 
   // Every ship must sail with a crew -- whatever ship the player ends up
   // with (kept, bought, or taken from the capture pile), an empty crew slot
@@ -896,7 +1015,7 @@ function estimateWinProb(attackerShip, defenderShip) {
 }
 
 function aiWantsHomePort(player) {
-  const captureValue = player.capturePile.reduce((sum, e) => { const c = findCard(e.cardId); return sum + (c ? cardSellValue(c) : 0); }, 0);
+  const captureValue = player.capturePile.reduce((sum, e) => { const c = findCard(e.cardId); return sum + (c ? cardSellValue(c, e.category) : 0); }, 0);
   const chance = clamp(captureValue / HOME_PORT_TRIGGER_RATIO, 0, 0.85);
   return Math.random() < chance;
 }
@@ -915,17 +1034,28 @@ function aiChooseHomePortShip(player) {
   return best;
 }
 
-// Whether the AI pays to retain its current crew for the next voyage --
-// only relevant when it's keeping its current ship (see aiChooseHomePortShip
-// above returning null). Worth it if the crew is actually good and the AI
-// isn't hurting for gold; rough heuristic, matches this file's other AI
-// estimates rather than exact optimization.
-function aiWantsRetainCrew(player) {
-  if (!player.ship.crew) return false;
-  const card = findCard(player.ship.crew.cardId);
-  const retainCost = card.value || 0;
-  if (totalBonus(card.bonus) <= 0) return false;
-  return player.stash >= retainCost * 2;
+// Crew/officer for the next voyage cost nothing extra to pick (Boss,
+// 2026-08-28), so the AI just takes whichever is strictly better between
+// its current one and anything sitting in its capture pile -- no
+// affordability question, matches aiChooseHomePortUpgrades' logic below.
+function aiChooseHomePortCrew(player) {
+  const current = player.ship.crew ? findCard(player.ship.crew.cardId) : null;
+  let best = null, bestTotal = current ? totalBonus(current.bonus) : -1;
+  player.capturePile.filter(e => e.category === 'crew').forEach(e => {
+    const card = findCard(e.cardId);
+    if (card && totalBonus(card.bonus) > bestTotal) { bestTotal = totalBonus(card.bonus); best = { uid: e.uid }; }
+  });
+  return best;
+}
+
+function aiChooseHomePortOfficer(player) {
+  const current = player.ship.officer ? findCard(player.ship.officer.cardId) : null;
+  let best = null, bestTotal = current ? totalBonus(current.bonus) : -1;
+  player.capturePile.filter(e => e.category === 'officer').forEach(e => {
+    const card = findCard(e.cardId);
+    if (card && totalBonus(card.bonus) > bestTotal) { bestTotal = totalBonus(card.bonus); best = { uid: e.uid }; }
+  });
+  return best;
 }
 
 // Picks which capture-pile upgrades the AI equips at Home Port -- free, so
