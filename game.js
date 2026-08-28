@@ -627,7 +627,6 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
   const seaShip = state.seaShips.find(s => s.id === seaShipId);
   if (!seaShip) return onDone && onDone();
   const attackerShip = attacker.ship;
-  const ownerIdx = seaShip.ownerIdx;
 
   const fear = rollIntimidation(attacker.name);
 
@@ -655,18 +654,23 @@ function attackSeaShip(attackerIdx, seaShipId, onDone) {
     return sinkOrCapture(attacker, seaShip, onDone);
   };
 
+  // A ship-at-sea is ownerless bait once placed -- nobody actually controls
+  // it, so there's no one to ask about fleeing. A fast enough one always
+  // attempts to flee automatically instead of offering anyone a choice
+  // (Boss, 2026-08-28: "they're being attacked by pirates, by default").
+  // Naval ships / Pirate Hunter-captained ships may get different default
+  // behavior later -- not decided yet. This is separate from the Defending
+  // Phase flee decision above, which is a real choice for the actual player
+  // whose own persistent ship is under attack.
   const atkSpd = shipRating(attackerShip, 'spd');
   const defSpd = shipRating(seaShip, 'spd') - fear.defSpdPenalty;
   if (defSpd >= atkSpd + 2) {
-    requestFleeDecision(ownerIdx, seaShip, attackerShip, (attemptFlee) => {
-      if (!attemptFlee) return proceed(false);
-      const fr = rollDie();
-      log(`The ship at sea attempts to flee — rolls ${fr} (need 1-5).`);
-      if (fr <= 5) return proceed(true);
-      log('Flee attempt fails! -1 Defense this combat.');
-      seaShip._fledAttemptFailed = true;
-      proceed(false);
-    });
+    const fr = rollDie();
+    log(`The ${findCard(seaShip.shipId).name} attempts to flee — rolls ${fr} (need 1-5).`);
+    if (fr <= 5) return proceed(true);
+    log('Flee attempt fails! -1 Defense this combat.');
+    seaShip._fledAttemptFailed = true;
+    proceed(false);
   } else {
     proceed(false);
   }
