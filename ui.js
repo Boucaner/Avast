@@ -342,7 +342,7 @@ function renderHandAndActions() {
     btn.className = 'action-btn primary';
     btn.textContent = 'Continue';
     btn.disabled = mustPlace;
-    btn.onclick = () => { finishShipsToSea(); render(); };
+    btn.onclick = () => { finishShipsToSea(); render(); scheduleAiIfNeeded(); };
     actionsEl.appendChild(btn);
   }
 }
