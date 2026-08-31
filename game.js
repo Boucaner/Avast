@@ -821,9 +821,9 @@ function finishShipsToSea() {
 }
 
 // ── Draw phase ───────────────────────────────────────────────────────────
-// Refill the regular hand, then draw a ship (mandatory, if the pile has one)
-// with up to SHIPS_TO_SEA_CAP total allowed this turn -- extra ships beyond
-// the first are optional, for next turn's Ships-to-Sea Phase to use.
+// Refill the regular hand, then auto-draw ships up to SHIPS_TO_SEA_CAP for
+// the turn (stopping early once the hand hits MAX_HAND_SHIPS or the pile
+// runs dry), for both human and AI, then end the turn immediately.
 
 function runDrawPhase() {
   state.phase = 'draw';
@@ -832,25 +832,9 @@ function runDrawPhase() {
   if (player.hand.length > MAX_HAND) player.hand = player.hand.slice(0, MAX_HAND);
 
   player.shipsDrawnThisTurn = 0;
-  drawOneShip(player);
+  while (player.shipsDrawnThisTurn < SHIPS_TO_SEA_CAP && drawOneShip(player)) {}
 
-  if (!player.isHuman) {
-    while (player.shipsDrawnThisTurn < SHIPS_TO_SEA_CAP && player.shipDrawPile.length && Math.random() < 0.4) {
-      drawOneShip(player);
-    }
-    return endTurn();
-  }
-  // human: ui.js shows "Draw Another Ship" / "End Turn"
-}
-
-function humanDrawAnotherShip() {
-  const player = state.players[state.currentTurn];
-  if (player.shipsDrawnThisTurn >= SHIPS_TO_SEA_CAP) return false;
-  return drawOneShip(player);
-}
-
-function finishDrawPhase() {
-  endTurn();
+  return endTurn();
 }
 
 function endTurn() {

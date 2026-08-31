@@ -344,17 +344,6 @@ function renderHandAndActions() {
     btn.disabled = mustPlace;
     btn.onclick = () => { finishShipsToSea(); render(); };
     actionsEl.appendChild(btn);
-  } else if (state.phase === 'draw') {
-    const shipCount = human.hand.filter(c => c.category === 'ship').length;
-    const atShipCap = shipCount >= MAX_HAND_SHIPS;
-    const remaining = SHIPS_TO_SEA_CAP - human.shipsDrawnThisTurn;
-    actionsEl.appendChild(phaseNote(atShipCap
-      ? `Your hand is full of ships (${shipCount}/${MAX_HAND_SHIPS}) — put some out to sea before drawing more.`
-      : `Drew a ship this turn. You may draw up to ${remaining} more from your ship pile before ending your turn.`));
-    if (remaining > 0 && human.shipDrawPile.length && !atShipCap) {
-      addAction(actionsEl, `Draw Another Ship (${human.shipsDrawnThisTurn}/${SHIPS_TO_SEA_CAP})`, () => { humanDrawAnotherShip(); render(); });
-    }
-    addAction(actionsEl, 'End Turn', () => { finishDrawPhase(); render(); scheduleAiIfNeeded(); });
   }
 }
 
