@@ -76,10 +76,13 @@ const CAPTAINS = [
   { id: 'capt-perales',    name: 'Juan González Perales',    captainType: 'Pirate Hunter', bonus: { spd: 1 }, cost: 150, flavor: 'Captured the pirate ship Cabellero Romano' },
 ];
 
-// Crew: the first three are starter crews (free, drawn from outside the deck).
+// Crew: the first two (marked `starter: true`) are starter crews -- free, drawn
+// from outside the deck. A third +1-attack starter (Raw Crew) was removed
+// 2026-09-01: base-4-attack Derelict + a +1-atk crew was too much turn-one
+// aggression. A stat-neutral third starter ("Lookout Crew") is planned -- see
+// the Avast vault note's open-items list.
 const CREW = [
   { id: 'crew-green',      name: 'Green Crew',      rarity: 'Common', value: 0,   bonus: { def: 1 }, starter: true, flavor: 'Unskilled and untrained, they fight mostly for their lives' },
-  { id: 'crew-raw',        name: 'Raw Crew',        rarity: 'Common', value: 0,   bonus: { atk: 1 }, starter: true, flavor: 'Eager, undisciplined, but they love the sight of blood' },
   { id: 'crew-frightened', name: 'Frightened Crew',  rarity: 'Common', value: 0,   bonus: { spd: 1 }, starter: true, flavor: 'Pressed into service, they excel at fleeing' },
   { id: 'crew-smart',      name: 'Smart Crew',      rarity: 'Common', value: 200, bonus: { def: 2 }, flavor: 'Knowing how to stay alive is good, but knowing how to keep their captain alive is better' },
   { id: 'crew-eager',      name: 'Eager Crew',      rarity: 'Common', value: 200, bonus: { atk: 2 }, flavor: 'They have fought and won, and they like it' },
