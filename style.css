@@ -213,7 +213,7 @@ html, body {
 .card-cat { text-transform: uppercase; letter-spacing: .5px; font-size: .6rem; color: #888; }
 .card-name { font-weight: 700; line-height: 1.15; }
 .card-stat { color: var(--green); font-weight: 600; }
-.card-wage { color: var(--gold); font-weight: 600; font-size: .62rem; line-height: 1; }
+.card-wage { color: #a16207; font-weight: 600; font-size: .62rem; line-height: 1; }
 
 .cardtype-ship     { border-top: 6px solid #2563eb; }
 .cardtype-captain  { border-top: 6px solid #7c3aed; }
