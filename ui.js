@@ -38,6 +38,16 @@ function categoryLabel(cat) {
   return { ship: 'Ship', captain: 'Captain', crew: 'Crew', officer: 'Officer', upgrade: 'Upgrade', treasure: 'Treasure', vip: 'VIP' }[cat] || cat;
 }
 
+// Crew/officer wage — what you pay in arrears at Home Port for a voyage they
+// crewed (crew's value, officer's cost). Shown on the card face so the cost
+// is visible before you commit; other card types don't carry a wage.
+function cardWageLine(card, category) {
+  if (category !== 'crew' && category !== 'officer') return '';
+  const g = card.value != null ? card.value : card.cost;
+  if (g == null) return '';
+  return `<div class="card-wage">Wage: ${g}g</div>`;
+}
+
 function makeCardEl(card, category, opts = {}) {
   const el = document.createElement('div');
   el.className = `card cardtype-${category}` + (opts.faceDown ? ' face-down' : '');
@@ -49,6 +59,7 @@ function makeCardEl(card, category, opts = {}) {
     <div class="card-cat">${categoryLabel(category)}</div>
     <div class="card-name">${card.name}</div>
     <div class="card-stat">${cardStatLine(card)}</div>
+    ${cardWageLine(card, category)}
   `;
   return el;
 }
