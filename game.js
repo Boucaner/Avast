@@ -869,6 +869,11 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, crewChoice, officerC
   const toEquip = player.capturePile.filter(e => e.category === 'upgrade' && equipUids.includes(e.uid));
   const chosenCrewEntry = crewChoice && crewChoice.uid ? player.capturePile.find(e => e.uid === crewChoice.uid && e.category === 'crew') : null;
   const chosenOfficerEntry = officerChoice && officerChoice.uid ? player.capturePile.find(e => e.uid === officerChoice.uid && e.category === 'officer') : null;
+  // { none: true } -- sail without one. Crew still resolves to the free
+  // starter crew below (every ship sails crewed); the officer slot just
+  // stays empty. Wages for the voyage just finished are still owed.
+  const dropCrew = !!(crewChoice && crewChoice.none);
+  const dropOfficer = !!(officerChoice && officerChoice.none);
 
   // 1) Sell capture pile (excluding a ship being kept to sail with, and any
   // upgrades chosen to equip instead) -- any ship cards among the sold cards
@@ -911,8 +916,8 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, crewChoice, officerC
   if (outgoingShip.crew) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.crew.cardId, category: 'crew' });
   if (outgoingShip.officer) player.discardPile.push({ uid: 'disc' + Math.random(), cardId: outgoingShip.officer.cardId, category: 'officer' });
 
-  const nextCrewCardId = forcedStarter ? null : (chosenCrewEntry ? chosenCrewEntry.cardId : (outgoingShip.crew ? outgoingShip.crew.cardId : null));
-  const nextOfficerCardId = forcedStarter ? null : (chosenOfficerEntry ? chosenOfficerEntry.cardId : (outgoingShip.officer ? outgoingShip.officer.cardId : null));
+  const nextCrewCardId = forcedStarter || dropCrew ? null : (chosenCrewEntry ? chosenCrewEntry.cardId : (outgoingShip.crew ? outgoingShip.crew.cardId : null));
+  const nextOfficerCardId = forcedStarter || dropOfficer ? null : (chosenOfficerEntry ? chosenOfficerEntry.cardId : (outgoingShip.officer ? outgoingShip.officer.cardId : null));
 
   // 4) Choose next ship. Whenever the ship is actually being replaced, the
   // outgoing one truly leaves play: its own card returns to the ship pile
@@ -952,6 +957,14 @@ function doHomePort(player, shipChoice, upgradeUidsToEquip, crewChoice, officerC
     player.capturePile = [];
     log(`${player.name} takes the captured ${findCard(chosenCaptureEntry.cardId).name} as their new ship.`);
   }
+
+  // When no ship swap happened, player.ship is still the outgoing ship and
+  // its crew/officer slots still hold the old cards. Clear them so the
+  // choices above are authoritative: "keep" re-sets the same type below,
+  // "swap" replaces it, and "none" leaves the slot empty (crew then
+  // auto-fills the starter). Ship-swap paths already start from a fresh
+  // instance, so they're untouched.
+  if (player.ship === outgoingShip) { player.ship.crew = null; player.ship.officer = null; }
 
   if (nextCrewCardId) player.ship.crew = { cardId: nextCrewCardId, faceUp: true };
   if (nextOfficerCardId) player.ship.officer = { cardId: nextOfficerCardId, faceUp: true };

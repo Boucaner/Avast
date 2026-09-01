@@ -387,6 +387,9 @@ let uiHomePortOfficerChoice = null;
 
 // Shared renderer for the crew and officer "who sails next" pickers -- same
 // shape for both, just a different category/current-attachment/UI-state.
+// Choice values: null = keep whoever's aboard; { uid } = a capture-pile card;
+// { none: true } = sail without one (officer slot stays empty; crew drops
+// back to the free starter crew, since every ship must sail crewed).
 function renderHomePortNextPicker(human, category, current, getChoice, setChoice, labelEl, containerEl) {
   const candidates = [];
   if (current) candidates.push({ uid: null, cardId: current.cardId });
@@ -394,20 +397,36 @@ function renderHomePortNextPicker(human, category, current, getChoice, setChoice
 
   containerEl.innerHTML = '';
   if (!candidates.length) { labelEl.classList.add('hidden'); return; }
+  candidates.push({ none: true });
   labelEl.classList.remove('hidden');
   labelEl.textContent = `Choose your ${category} for the next voyage (no extra fee either way):`;
   const chosen = getChoice();
   candidates.forEach(cand => {
-    const card = findCard(cand.cardId);
-    if (!card) return;
-    const isSelected = chosen ? chosen.uid === cand.uid : cand.uid === null;
+    let isSelected;
+    if (!chosen) isSelected = cand.uid === null && !cand.none; // default: keep whoever's aboard
+    else if (chosen.none) isSelected = !!cand.none;
+    else isSelected = !cand.none && chosen.uid === cand.uid;
     const wrap = document.createElement('div');
     wrap.className = 'hand-card-wrap' + (isSelected ? ' equip-selected' : '');
-    wrap.appendChild(makeCardEl(card, category));
+
+    if (cand.none) {
+      const tile = document.createElement('div');
+      tile.className = 'card card-none';
+      tile.textContent = category === 'officer' ? 'No officer' : 'Starter crew';
+      wrap.appendChild(tile);
+    } else {
+      const card = findCard(cand.cardId);
+      if (!card) return;
+      wrap.appendChild(makeCardEl(card, category));
+    }
+
     const btn = document.createElement('button');
     btn.className = 'mini-btn';
     btn.textContent = isSelected ? 'Sailing with this ✓' : 'Choose';
-    btn.onclick = () => { setChoice(cand.uid === null ? null : { uid: cand.uid }); openHomePortModal(); };
+    btn.onclick = () => {
+      setChoice(cand.none ? { none: true } : (cand.uid === null ? null : { uid: cand.uid }));
+      openHomePortModal();
+    };
     wrap.appendChild(btn);
     containerEl.appendChild(wrap);
   });
